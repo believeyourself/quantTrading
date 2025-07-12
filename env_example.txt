@@ -1,0 +1,30 @@
+# 数据库配置
+DATABASE_URL=sqlite:///./quant_trading.db
+
+# API配置
+API_HOST=0.0.0.0
+API_PORT=8000
+DEBUG=true
+
+# 交易配置
+DEFAULT_CAPITAL=10000.0
+MAX_POSITION_SIZE=0.1
+STOP_LOSS_RATIO=0.05
+TAKE_PROFIT_RATIO=0.1
+
+# 数据源配置
+DATA_SOURCE=yfinance
+DEFAULT_TIMEFRAME=1d
+
+# 交易所配置 (用于实盘交易)
+EXCHANGE_NAME=binance
+API_KEY=your_api_key_here
+API_SECRET=your_api_secret_here
+TESTNET=true
+
+# 日志配置
+LOG_LEVEL=INFO
+LOG_FILE=logs/quant_trading.log 
+
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here  # 用于发送通知的Telegram机器人Token
+TELEGRAM_CHAT_ID=your_telegram_chat_id_here      # 用于接收通知的Telegram聊天ID 
