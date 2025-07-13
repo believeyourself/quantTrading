@@ -41,13 +41,15 @@ app.layout = dbc.Container([
                 dbc.Col([
                     html.H3("创建新策略"),
                     dbc.Form([
-                        dbc.FormGroup([
-                            dbc.Label("策略名称"),
-                            dbc.Input(id="strategy-name", type="text", placeholder="输入策略名称")
-                        ]),
-                        dbc.FormGroup([
-                            dbc.Label("策略描述"),
-                            dbc.Textarea(id="strategy-description", placeholder="输入策略描述")
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Label("策略名称"),
+                                dbc.Input(id="strategy-name", type="text", placeholder="输入策略名称")
+                            ], width=6),
+                            dbc.Col([
+                                dbc.Label("策略描述"),
+                                dbc.Textarea(id="strategy-description", placeholder="输入策略描述")
+                            ], width=6)
                         ]),
                         # 策略类型选择
                         html.Div([
@@ -67,29 +69,33 @@ app.layout = dbc.Container([
                         # 资金费率套利策略参数
                         html.Div(id='funding-rate-params', style={'display': 'none'}, children=[
                             html.H5("资金费率套利策略参数"),
-                            html.Div([
-                                html.Label("资金费率阈值 (%):"),
-                                dcc.Input(id='funding-rate-threshold', type='number', value=0.5, step=0.1)
+                            dbc.Row([
+                                dbc.Col([
+                                    html.Label("资金费率阈值 (%):"),
+                                    dcc.Input(id='funding-rate-threshold', type='number', value=0.5, step=0.1)
+                                ], width=6),
+                                dbc.Col([
+                                    html.Label("最大持仓数量:"),
+                                    dcc.Input(id='max-positions', type='number', value=10, min=1, max=50)
+                                ], width=6)
                             ], style={'marginBottom': '10px'}),
-                            html.Div([
-                                html.Label("最大持仓数量:"),
-                                dcc.Input(id='max-positions', type='number', value=10, min=1, max=50)
-                            ], style={'marginBottom': '10px'}),
-                            html.Div([
-                                html.Label("最小24小时成交量:"),
-                                dcc.Input(id='min-volume', type='number', value=1000000, step=100000)
-                            ], style={'marginBottom': '10px'}),
-                            html.Div([
-                                html.Label("支持的交易所:"),
-                                dcc.Checklist(
-                                    id='exchanges-checklist',
-                                    options=[
-                                        {'label': 'Binance', 'value': 'binance'},
-                                        {'label': 'OKX', 'value': 'okx'},
-                                        {'label': 'Bybit', 'value': 'bybit'}
-                                    ],
-                                    value=['binance', 'okx', 'bybit']
-                                )
+                            dbc.Row([
+                                dbc.Col([
+                                    html.Label("最小24小时成交量:"),
+                                    dcc.Input(id='min-volume', type='number', value=1000000, step=100000)
+                                ], width=6),
+                                dbc.Col([
+                                    html.Label("支持的交易所:"),
+                                    dcc.Checklist(
+                                        id='exchanges-checklist',
+                                        options=[
+                                            {'label': 'Binance', 'value': 'binance'},
+                                            {'label': 'OKX', 'value': 'okx'},
+                                            {'label': 'Bybit', 'value': 'bybit'}
+                                        ],
+                                        value=['binance', 'okx', 'bybit']
+                                    )
+                                ], width=6)
                             ], style={'marginBottom': '10px'})
                         ]),
                         # 资金费率套利策略控制
@@ -99,9 +105,11 @@ app.layout = dbc.Container([
                             html.Button("查看池子状态", id='view-pool-status-btn', n_clicks=0),
                             html.Div(id='pool-status-display')
                         ]),
-                        dbc.FormGroup([
-                            dbc.Label("参数配置"),
-                            dcc.Textarea(id="strategy-parameters", placeholder='{"param1": value1, "param2": value2}')
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Label("参数配置"),
+                                dcc.Textarea(id="strategy-parameters", placeholder='{"param1": value1, "param2": value2}')
+                            ], width=12)
                         ]),
                         dbc.Button("创建策略", id="create-strategy", color="success", className="mt-3")
                     ])
@@ -115,48 +123,48 @@ app.layout = dbc.Container([
                 dbc.Col([
                     html.H3("回测配置"),
                     dbc.Form([
-                        dbc.FormGroup([
-                            dbc.Label("选择策略"),
-                            dcc.Dropdown(id="backtest-strategy", placeholder="选择要回测的策略")
-                        ]),
-                        dbc.FormGroup([
-                            dbc.Label("交易对"),
-                            dcc.Dropdown(id="backtest-symbol", placeholder="选择交易对")
-                        ]),
-                        dbc.FormGroup([
-                            dbc.Label("时间周期"),
-                            dcc.Dropdown(
-                                id="backtest-timeframe",
-                                options=[
-                                    {"label": "1分钟", "value": "1m"},
-                                    {"label": "5分钟", "value": "5m"},
-                                    {"label": "15分钟", "value": "15m"},
-                                    {"label": "30分钟", "value": "30m"},
-                                    {"label": "1小时", "value": "1h"},
-                                    {"label": "4小时", "value": "4h"},
-                                    {"label": "1天", "value": "1d"},
-                                    {"label": "1周", "value": "1w"}
-                                ],
-                                value="1d"
-                            )
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Label("选择策略"),
+                                dcc.Dropdown(id="backtest-strategy", placeholder="选择要回测的策略")
+                            ], width=6),
+                            dbc.Col([
+                                dbc.Label("交易对"),
+                                dcc.Dropdown(id="backtest-symbol", placeholder="选择交易对")
+                            ], width=6)
                         ]),
                         dbc.Row([
                             dbc.Col([
-                                dbc.FormGroup([
-                                    dbc.Label("开始日期"),
-                                    dcc.DatePickerSingle(id="backtest-start-date")
-                                ])
+                                dbc.Label("时间周期"),
+                                dcc.Dropdown(
+                                    id="backtest-timeframe",
+                                    options=[
+                                        {"label": "1分钟", "value": "1m"},
+                                        {"label": "5分钟", "value": "5m"},
+                                        {"label": "15分钟", "value": "15m"},
+                                        {"label": "30分钟", "value": "30m"},
+                                        {"label": "1小时", "value": "1h"},
+                                        {"label": "4小时", "value": "4h"},
+                                        {"label": "1天", "value": "1d"},
+                                        {"label": "1周", "value": "1w"}
+                                    ],
+                                    value="1d"
+                                )
                             ], width=6),
                             dbc.Col([
-                                dbc.FormGroup([
-                                    dbc.Label("结束日期"),
-                                    dcc.DatePickerSingle(id="backtest-end-date")
-                                ])
+                                dbc.Label("开始日期"),
+                                dcc.DatePickerSingle(id="backtest-start-date")
                             ], width=6)
                         ]),
-                        dbc.FormGroup([
-                            dbc.Label("初始资金"),
-                            dbc.Input(id="backtest-capital", type="number", value=10000)
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Label("结束日期"),
+                                dcc.DatePickerSingle(id="backtest-end-date")
+                            ], width=6),
+                            dbc.Col([
+                                dbc.Label("初始资金"),
+                                dcc.Input(id="backtest-capital", type="number", value=10000)
+                            ], width=6)
                         ]),
                         dbc.Button("开始回测", id="start-backtest", color="primary", className="mt-3")
                     ])
@@ -175,48 +183,56 @@ app.layout = dbc.Container([
                 dbc.Col([
                     html.H3("交易配置"),
                     dbc.Form([
-                        dbc.FormGroup([
-                            dbc.Label("交易引擎名称"),
-                            dbc.Input(id="engine-name", type="text", placeholder="输入引擎名称")
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Label("交易引擎名称"),
+                                dbc.Input(id="engine-name", type="text", placeholder="输入引擎名称")
+                            ], width=6),
+                            dbc.Col([
+                                dbc.Label("交易类型"),
+                                dcc.Dropdown(
+                                    id="trade-type",
+                                    options=[
+                                        {"label": "模拟交易", "value": "paper"},
+                                        {"label": "实盘交易", "value": "live"}
+                                    ],
+                                    value="paper"
+                                )
+                            ], width=6)
                         ]),
-                        dbc.FormGroup([
-                            dbc.Label("交易类型"),
-                            dcc.Dropdown(
-                                id="trade-type",
-                                options=[
-                                    {"label": "模拟交易", "value": "paper"},
-                                    {"label": "实盘交易", "value": "live"}
-                                ],
-                                value="paper"
-                            )
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Label("选择策略"),
+                                dcc.Dropdown(id="trading-strategy", placeholder="选择交易策略")
+                            ], width=6),
+                            dbc.Col([
+                                dbc.Label("交易对"),
+                                dcc.Dropdown(id="trading-symbol", placeholder="选择交易对")
+                            ], width=6)
                         ]),
-                        dbc.FormGroup([
-                            dbc.Label("选择策略"),
-                            dcc.Dropdown(id="trading-strategy", placeholder="选择交易策略")
-                        ]),
-                        dbc.FormGroup([
-                            dbc.Label("交易对"),
-                            dcc.Dropdown(id="trading-symbol", placeholder="选择交易对")
-                        ]),
-                        dbc.FormGroup([
-                            dbc.Label("时间周期"),
-                            dcc.Dropdown(
-                                id="trading-timeframe",
-                                options=[
-                                    {"label": "1分钟", "value": "1m"},
-                                    {"label": "5分钟", "value": "5m"},
-                                    {"label": "15分钟", "value": "15m"},
-                                    {"label": "30分钟", "value": "30m"},
-                                    {"label": "1小时", "value": "1h"},
-                                    {"label": "4小时", "value": "4h"},
-                                    {"label": "1天", "value": "1d"},
-                                    {"label": "1周", "value": "1w"}
-                                ],
-                                value="1d"
-                            )
-                        ]),
-                        dbc.Button("创建交易引擎", id="create-engine", color="success", className="mt-3"),
-                        dbc.Button("运行策略", id="run-strategy", color="primary", className="mt-3 ml-2")
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Label("时间周期"),
+                                dcc.Dropdown(
+                                    id="trading-timeframe",
+                                    options=[
+                                        {"label": "1分钟", "value": "1m"},
+                                        {"label": "5分钟", "value": "5m"},
+                                        {"label": "15分钟", "value": "15m"},
+                                        {"label": "30分钟", "value": "30m"},
+                                        {"label": "1小时", "value": "1h"},
+                                        {"label": "4小时", "value": "4h"},
+                                        {"label": "1天", "value": "1d"},
+                                        {"label": "1周", "value": "1w"}
+                                    ],
+                                    value="1d"
+                                )
+                            ], width=6),
+                            dbc.Col([
+                                dbc.Button("创建交易引擎", id="create-engine", color="success", className="mt-3"),
+                                dbc.Button("运行策略", id="run-strategy", color="primary", className="mt-3 ml-2")
+                            ], width=6)
+                        ])
                     ])
                 ], width=4),
                 dbc.Col([
@@ -236,35 +252,45 @@ app.layout = dbc.Container([
                 dbc.Col([
                     html.H3("市场数据"),
                     dbc.Form([
-                        dbc.FormGroup([
-                            dbc.Label("交易对"),
-                            dcc.Dropdown(id="data-symbol", placeholder="选择交易对")
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Label("交易对"),
+                                dcc.Dropdown(id="data-symbol", placeholder="选择交易对")
+                            ], width=6),
+                            dbc.Col([
+                                dbc.Label("时间周期"),
+                                dcc.Dropdown(
+                                    id="data-timeframe",
+                                    options=[
+                                        {"label": "1分钟", "value": "1m"},
+                                        {"label": "5分钟", "value": "5m"},
+                                        {"label": "15分钟", "value": "15m"},
+                                        {"label": "30分钟", "value": "30m"},
+                                        {"label": "1小时", "value": "1h"},
+                                        {"label": "4小时", "value": "4h"},
+                                        {"label": "1天", "value": "1d"},
+                                        {"label": "1周", "value": "1w"}
+                                    ],
+                                    value="1d"
+                                )
+                            ], width=6)
                         ]),
-                        dbc.FormGroup([
-                            dbc.Label("时间周期"),
-                            dcc.Dropdown(
-                                id="data-timeframe",
-                                options=[
-                                    {"label": "1分钟", "value": "1m"},
-                                    {"label": "5分钟", "value": "5m"},
-                                    {"label": "15分钟", "value": "15m"},
-                                    {"label": "30分钟", "value": "30m"},
-                                    {"label": "1小时", "value": "1h"},
-                                    {"label": "4小时", "value": "4h"},
-                                    {"label": "1天", "value": "1d"},
-                                    {"label": "1周", "value": "1w"}
-                                ],
-                                value="1d"
-                            )
-                        ]),
-                        dbc.Button("更新数据", id="update-data", color="primary", className="mt-3"),
-                        dbc.Button("获取最新价格", id="get-price", color="info", className="mt-3 ml-2")
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Button("更新数据", id="update-data", color="primary", className="mt-3"),
+                                dbc.Button("获取最新价格", id="get-price", color="info", className="mt-3 ml-2")
+                            ], width=6),
+                            dbc.Col([
+                                html.H3("价格信息"),
+                                html.Div(id="price-info")
+                            ], width=6)
+                        ])
                     ])
                 ], width=4),
                 dbc.Col([
                     html.H3("价格图表"),
                     dcc.Graph(id="price-chart"),
-                    html.Div(id="price-info")
+                    html.Div(id="price-chart-info")
                 ], width=8)
             ])
         ], label="市场数据")
@@ -278,7 +304,7 @@ app.layout = dbc.Container([
 # 回调函数
 @app.callback(
     [Output("strategies-list", "children"),
-     Output("strategy-type", "options")],
+     Output("strategy-type-dropdown", "options")],
     [Input("refresh-strategies", "n_clicks")]
 )
 def load_strategies(n_clicks):
@@ -324,7 +350,7 @@ def load_strategies(n_clicks):
     [Input("create-strategy", "n_clicks")],
     [State("strategy-name", "value"),
      State("strategy-description", "value"),
-     State("strategy-type", "value"),
+     State("strategy-type-dropdown", "value"),
      State("strategy-parameters", "value")]
 )
 def create_strategy(n_clicks, name, description, strategy_type, parameters):
@@ -571,7 +597,7 @@ def trading_operations(create_clicks, run_clicks, engine_name, trade_type,
 
 @app.callback(
     [Output("price-chart", "figure"),
-     Output("price-info", "children")],
+     Output("price-chart-info", "children")],
     [Input("update-data", "n_clicks"),
      Input("get-price", "n_clicks")],
     [State("data-symbol", "value"),
@@ -679,4 +705,4 @@ def initialize_options(n_clicks):
         return [], [], [], [], []
 
 if __name__ == "__main__":
-    app.run_server(debug=True, host="0.0.0.0", port=8050) 
+    app.run(debug=True, host="0.0.0.0", port=8050) 

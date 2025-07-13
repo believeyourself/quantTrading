@@ -22,10 +22,10 @@ class Settings(BaseSettings):
     DEFAULT_SYMBOLS: List[str] = ["BTC-USD", "ETH-USD", "AAPL", "GOOGL"]
     
     # 交易配置
-    DEFAULT_CAPITAL: float = 10000.0
+    DEFAULT_CAPITAL: float = 10.0
     MAX_POSITION_SIZE: float = 0.1  # 最大仓位10%
-    STOP_LOSS_RATIO: float = 0.05   # 止损5%
-    TAKE_PROFIT_RATIO: float = 0.1  # 止盈10%
+    STOP_LOSS_RATIO: float = 0.5   # 止损5%
+    TAKE_PROFIT_RATIO: float = 5  # 止盈10%
     
     # 交易所配置
     EXCHANGE_NAME: str = "binance"
@@ -62,7 +62,10 @@ class Settings(BaseSettings):
             "funding_rate_threshold": 0.005,
             "max_positions": 10,
             "min_volume": 1000000,
-            "exchanges": ["binance", "okx", "bybit"]
+            "exchanges": ["binance"],
+            "cache_duration": 3600,
+            "update_interval": 1800,
+            "funding_interval": 3600
         }
     }
     

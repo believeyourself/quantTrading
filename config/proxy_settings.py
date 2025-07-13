@@ -48,6 +48,21 @@ def get_proxy_dict():
         'https': proxy_url,
     }
 
+def get_ccxt_proxy_config():
+    """获取CCXT专用的代理配置"""
+    if not PROXY_CONFIG['enabled']:
+        return {}
+    
+    return {
+        'proxies': {
+            'http': f"http://{PROXY_CONFIG['host']}:{PROXY_CONFIG['port']}",
+            'https': f"http://{PROXY_CONFIG['host']}:{PROXY_CONFIG['port']}",
+        },
+        'timeout': 60000,  # 增加超时时间
+        'enableRateLimit': True,
+        'rateLimit': 2000,
+    }
+
 def test_proxy_connection():
     """测试代理连接"""
     import requests
@@ -61,7 +76,8 @@ def test_proxy_connection():
         response = requests.get(
             "https://api.binance.com/api/v3/ping", 
             proxies=proxies, 
-            timeout=10
+            timeout=10,
+            verify=False  # 禁用SSL验证
         )
         
         if response.status_code == 200:
@@ -100,7 +116,8 @@ def detect_proxy_port():
             response = requests.get(
                 "https://api.binance.com/api/v3/ping", 
                 proxies=proxies, 
-                timeout=5
+                timeout=5,
+                verify=False
             )
             
             if response.status_code == 200:

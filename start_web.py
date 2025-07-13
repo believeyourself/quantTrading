@@ -16,7 +16,7 @@ if __name__ == "__main__":
     print("访问地址: http://localhost:8050")
     print("按 Ctrl+C 停止服务")
     
-    app.run_server(
+    app.run(
         debug=True,
         host="0.0.0.0",
         port=8050

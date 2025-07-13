@@ -32,6 +32,9 @@ aiohttp==3.9.1
 # HTTP请求
 requests==2.31.0
 
+# 定时任务
+schedule==1.2.0
+
 # 日志
 loguru==0.7.2
 

@@ -235,6 +235,72 @@ def run_funding_arbitrage(strategy_id: int, db: SessionLocal = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"策略运行失败: {str(e)}")
 
+@app.post("/strategies/{strategy_id}/update-cache")
+def update_funding_cache(strategy_id: int, db: SessionLocal = Depends(get_db)):
+    """强制更新资金费率套利策略缓存"""
+    strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
+    if not strategy:
+        raise HTTPException(status_code=404, detail="策略不存在")
+    
+    if strategy.strategy_type != "funding_rate_arbitrage":
+        raise HTTPException(status_code=400, detail="该策略不是资金费率套利策略")
+    
+    try:
+        # 创建策略实例
+        strategy_instance = StrategyFactory.create_strategy(
+            strategy.strategy_type, 
+            json.loads(strategy.parameters)
+        )
+        
+        # 强制更新缓存
+        update_result = strategy_instance.force_update_cache()
+        
+        return {
+            "message": "缓存更新成功",
+            "update_result": update_result,
+            "pool_status": strategy_instance.get_pool_status()
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"缓存更新失败: {str(e)}")
+
+@app.get("/strategies/{strategy_id}/cache-status")
+def get_cache_status(strategy_id: int, db: SessionLocal = Depends(get_db)):
+    """获取资金费率套利策略缓存状态"""
+    strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
+    if not strategy:
+        raise HTTPException(status_code=404, detail="策略不存在")
+    
+    if strategy.strategy_type != "funding_rate_arbitrage":
+        raise HTTPException(status_code=400, detail="该策略不是资金费率套利策略")
+    
+    try:
+        # 创建策略实例
+        strategy_instance = StrategyFactory.create_strategy(
+            strategy.strategy_type, 
+            json.loads(strategy.parameters)
+        )
+        
+        # 获取缓存状态
+        pool_status = strategy_instance.get_pool_status()
+        
+        return {
+            "cache_status": {
+                "cached_contracts_count": pool_status.get('cached_contracts_count', 0),
+                "last_update_time": pool_status.get('last_update_time'),
+                "cache_valid": pool_status.get('cache_valid', False),
+                "pool_size": pool_status.get('pool_size', 0)
+            },
+            "strategy_info": {
+                "name": strategy.name,
+                "strategy_type": strategy.strategy_type,
+                "parameters": strategy.get_parameters()
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取缓存状态失败: {str(e)}")
+
 # 回测API
 @app.post("/backtest", response_model=Dict[str, Any])
 def run_backtest(backtest_request: BacktestRequest, background_tasks: BackgroundTasks):

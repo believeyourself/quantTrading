@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from loguru import logger
 import json
 
-from strategies.factory import BaseStrategy, Signal
+from strategies.base import BaseStrategy, Signal
 from data.manager import data_manager
 from utils.models import Backtest, BacktestTrade, SessionLocal
 
