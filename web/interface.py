@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 import requests
 import json
 from typing import Dict, List, Any
+from utils.binance_funding import BinanceFunding
 
 # 配置
 API_BASE_URL = "http://localhost:8000"

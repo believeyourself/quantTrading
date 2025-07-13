@@ -150,29 +150,44 @@ class BinanceFunding:
             
             for i, symbol in enumerate(perpetual_symbols):
                 try:
-                    # 获取资金费率信息
-                    funding_info = self.um.market.get_fundingRate(symbol=symbol)
+                    # 使用detect_funding_interval方法检测结算周期
+                    interval = self.detect_funding_interval(symbol, contract_type)
                     
-                    if isinstance(funding_info, dict) and 'data' in funding_info:
-                        funding_data = funding_info.get('data', [])
+                    if interval:
+                        # 检查是否为1小时结算周期（允许0.1小时的误差）
+                        if abs(interval - 1.0) < 0.1:
+                            # 获取合约详细信息
+                            contract_info = self.get_comprehensive_info(symbol, contract_type)
+                            if contract_info:
+                                h1_contracts[symbol] = contract_info
+                                print(f"  ✅ {symbol}: 1小时结算周期 (检测到: {interval:.2f}小时)")
+                        elif abs(interval - 8.0) < 0.1:
+                            print(f"  📊 {symbol}: 8小时结算周期 (检测到: {interval:.2f}小时)")
+                        else:
+                            print(f"  📊 {symbol}: {interval:.1f}小时结算周期")
                     else:
-                        funding_data = funding_info if isinstance(funding_info, list) else []
-                    
-                    if funding_data:
-                        # 检查结算周期
-                        next_funding_time = funding_data[0].get('nextFundingTime')
-                        if next_funding_time:
-                            next_time = datetime.fromtimestamp(next_funding_time / 1000)
+                        # 如果detect_funding_interval失败，尝试其他方法
+                        current_info = self.get_current_funding(symbol, contract_type)
+                        if current_info and current_info.get('next_funding_time'):
+                            next_time = datetime.fromtimestamp(current_info['next_funding_time'] / 1000)
                             now = datetime.now()
                             time_diff = (next_time - now).total_seconds()
                             
-                            # 1小时结算周期：距离下次结算时间应该在0-3600秒之间
+                            # 如果距离下次结算时间在1小时内，可能是1小时结算
                             if 0 <= time_diff <= 3600:
-                                # 获取合约详细信息
-                                contract_info = self.get_comprehensive_info(symbol, contract_type)
-                                if contract_info:
-                                    h1_contracts[symbol] = contract_info
-                                    print(f"  ✅ {symbol}: 1小时结算周期")
+                                # 再次尝试获取历史数据来确认
+                                history = self.get_funding_history(symbol, contract_type, limit=3)
+                                if len(history) >= 2:
+                                    # 计算最近两次结算的时间间隔
+                                    t1 = history[0]['funding_time']
+                                    t2 = history[1]['funding_time']
+                                    if t1 and t2:
+                                        calc_interval = abs(t1 - t2) / (1000 * 3600)
+                                        if abs(calc_interval - 1.0) < 0.1:
+                                            contract_info = self.get_comprehensive_info(symbol, contract_type)
+                                            if contract_info:
+                                                h1_contracts[symbol] = contract_info
+                                                print(f"  ✅ {symbol}: 1小时结算周期 (备用检测: {calc_interval:.2f}小时)")
                     
                     # 限流控制
                     if (i + 1) % 50 == 0:
@@ -210,9 +225,10 @@ class BinanceFunding:
             print(f"❌ 扫描1小时结算合约失败: {e}")
             return {}
     
-    def get_1h_contracts_from_cache(self):
-        """从缓存获取1小时结算周期合约"""
+    def get_1h_contracts_from_cache(self, tg_notifier=None):
+        """从缓存获取1小时结算周期合约，只读取不刷新"""
         cache_file = "cache/1h_funding_contracts_full.json"
+        cache_duration = 3600  # 1小时缓存有效期
         
         if os.path.exists(cache_file):
             try:
@@ -225,9 +241,24 @@ class BinanceFunding:
                 print(f"📋 缓存时间: {cache_age:.0f}秒前")
                 print(f"📊 1小时结算合约: {len(cache_data.get('contracts', {}))}个")
                 
+                # 检查缓存是否过期
+                if cache_age > cache_duration:
+                    msg = f"⚠️ 1小时结算合约缓存已过期 {cache_age/3600:.2f} 小时，定时任务可能未正常更新！"
+                    print(msg)
+                    if tg_notifier:
+                        try:
+                            tg_notifier(msg)
+                        except Exception as e:
+                            print(f"❌ 发送Telegram通知失败: {e}")
+                
                 return cache_data.get('contracts', {})
             except Exception as e:
                 print(f"⚠️ 读取缓存失败: {e}")
+                if tg_notifier:
+                    try:
+                        tg_notifier(f"❌ 读取1小时结算合约缓存失败: {e}")
+                    except Exception as notify_e:
+                        print(f"❌ 发送Telegram通知失败: {notify_e}")
         
         return {}
     
