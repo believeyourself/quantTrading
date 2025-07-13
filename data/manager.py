@@ -214,18 +214,41 @@ class DataManager:
     
     def get_symbols(self) -> List[str]:
         """获取支持的交易对列表"""
-        if self.source == "yfinance":
-            # 返回一些常见的加密货币
-            return ["BTC-USD", "ETH-USD", "BNB-USD", "ADA-USD", "SOL-USD"]
-        elif self.source == "ccxt":
-            try:
-                markets = self.exchange.load_markets()
-                return list(markets.keys())
-            except Exception as e:
-                logger.error(f"获取交易对列表失败: {e}")
+        try:
+            # 优先从1h_funding_contracts_full.json配置文件读取交易对
+            import json
+            import os
+            
+            cache_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 
+                                    "cache", "1h_funding_contracts_full.json")
+            
+            if os.path.exists(cache_file):
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    if 'contracts' in data:
+                        # 提取所有交易对符号
+                        symbols = list(data['contracts'].keys())
+                        logger.info(f"从配置文件加载了 {len(symbols)} 个交易对")
+                        return symbols
+            
+            # 如果配置文件不存在，则使用默认方法
+            if self.source == "yfinance":
+                # 返回一些常见的加密货币
+                return ["BTC-USD", "ETH-USD", "BNB-USD", "ADA-USD", "SOL-USD"]
+            elif self.source == "ccxt":
+                try:
+                    markets = self.exchange.load_markets()
+                    return list(markets.keys())
+                except Exception as e:
+                    logger.error(f"获取交易对列表失败: {e}")
+                    return []
+            else:
                 return []
-        else:
-            return []
+                
+        except Exception as e:
+            logger.error(f"从配置文件读取交易对失败: {e}")
+            # 返回默认交易对
+            return ["BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "SOLUSDT"]
     
     def __del__(self):
         """析构函数，关闭数据库连接"""

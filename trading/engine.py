@@ -345,10 +345,15 @@ class TradingEngine:
         """获取账户摘要"""
         try:
             if self.trade_type == "paper":
+                # 计算总权益（余额 + 未实现盈亏）
+                total_equity = self.paper_account['balance']
+                for position in self.paper_account['positions'].values():
+                    total_equity += position.unrealized_pnl
+                
                 return {
                     'account_type': 'paper',
                     'balance': self.paper_account['balance'],
-                    'equity': self.paper_account['equity'],
+                    'equity': total_equity,
                     'positions_count': len(self.paper_account['positions']),
                     'total_trades': len(self.paper_account['trades'])
                 }
@@ -357,12 +362,19 @@ class TradingEngine:
                 return {
                     'account_type': 'live',
                     'balance': balance['total']['USDT'],
+                    'equity': balance['total']['USDT'],
                     'free_balance': balance['free']['USDT'],
                     'used_balance': balance['used']['USDT']
                 }
         except Exception as e:
             logger.error(f"获取账户摘要失败: {e}")
-            return {}
+            return {
+                'account_type': 'paper',
+                'balance': 0.0,
+                'equity': 0.0,
+                'positions_count': 0,
+                'total_trades': 0
+            }
     
     def get_positions(self) -> List[Dict]:
         """获取所有持仓"""

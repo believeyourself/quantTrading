@@ -10,7 +10,7 @@ import time
 import threading
 
 def start_api_server():
-    """启动API服务"""
+    """启动API服务（包含资金费率套利功能）"""
     print("启动API服务...")
     subprocess.run([sys.executable, "start_api.py"])
 
@@ -21,7 +21,7 @@ def start_web_server():
 
 if __name__ == "__main__":
     print("启动量化交易系统...")
-    print("API服务: http://localhost:8000")
+    print("API服务: http://localhost:8000 (包含资金费率套利)")
     print("Web界面: http://localhost:8050")
     print("按 Ctrl+C 停止所有服务")
     

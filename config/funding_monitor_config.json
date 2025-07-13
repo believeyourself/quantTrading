@@ -1,5 +1,5 @@
 {
-  "funding_rate_threshold": 0.005,
+  "funding_rate_threshold": 0.001,
   "scan_interval_seconds": 1800,
   "cache_update_interval_seconds": 21600,
   "max_contracts_in_pool": 50,

@@ -1,25 +1,13 @@
 {
-  "cache_time": "2025-07-13T17:57:29.661305",
+  "cache_time": "2025-07-13T18:59:04.893569",
   "contracts": {
     "RVNUSDT": {
       "symbol": "RVNUSDT",
       "contract_type": "UM",
       "current_funding_rate": "0.00001250",
-      "funding_interval_hours": 1.0000002777777777,
-      "next_funding_time": "2025-07-13T18:00:00",
+      "funding_interval_hours": 0.9999997222222222,
+      "next_funding_time": "2025-07-13T19:00:00",
       "history_rates": [
-        {
-          "symbol": "RVNUSDT",
-          "funding_time": 1752382800001,
-          "funding_rate": "0.00001250",
-          "mark_price": "0.01414000",
-          "raw": {
-            "symbol": "RVNUSDT",
-            "fundingTime": 1752382800001,
-            "fundingRate": "0.00001250",
-            "markPrice": "0.01414000"
-          }
-        },
         {
           "symbol": "RVNUSDT",
           "funding_time": 1752386400008,
@@ -67,29 +55,29 @@
             "fundingRate": "0.00001250",
             "markPrice": "0.01410134"
           }
+        },
+        {
+          "symbol": "RVNUSDT",
+          "funding_time": 1752400800001,
+          "funding_rate": "0.00001250",
+          "mark_price": "0.01408387",
+          "raw": {
+            "symbol": "RVNUSDT",
+            "fundingTime": 1752400800001,
+            "fundingRate": "0.00001250",
+            "markPrice": "0.01408387"
+          }
         }
       ],
-      "last_updated": "2025-07-13T17:49:07.557671"
+      "last_updated": "2025-07-13T18:56:56.864205"
     },
     "MASKUSDT": {
       "symbol": "MASKUSDT",
       "contract_type": "UM",
-      "current_funding_rate": "-0.00022488",
-      "funding_interval_hours": 1.0000002777777777,
-      "next_funding_time": "2025-07-13T18:00:00",
+      "current_funding_rate": "-0.00008533",
+      "funding_interval_hours": 0.9999997222222222,
+      "next_funding_time": "2025-07-13T19:00:00",
       "history_rates": [
-        {
-          "symbol": "MASKUSDT",
-          "funding_time": 1752382800001,
-          "funding_rate": "-0.00003528",
-          "mark_price": "1.37210000",
-          "raw": {
-            "symbol": "MASKUSDT",
-            "fundingTime": 1752382800001,
-            "fundingRate": "-0.00003528",
-            "markPrice": "1.37210000"
-          }
-        },
         {
           "symbol": "MASKUSDT",
           "funding_time": 1752386400008,
@@ -137,29 +125,29 @@
             "fundingRate": "-0.00012534",
             "markPrice": "1.37266441"
           }
+        },
+        {
+          "symbol": "MASKUSDT",
+          "funding_time": 1752400800001,
+          "funding_rate": "-0.00010081",
+          "mark_price": "1.36013289",
+          "raw": {
+            "symbol": "MASKUSDT",
+            "fundingTime": 1752400800001,
+            "fundingRate": "-0.00010081",
+            "markPrice": "1.36013289"
+          }
         }
       ],
-      "last_updated": "2025-07-13T17:49:15.351633"
+      "last_updated": "2025-07-13T18:57:03.935674"
     },
     "LPTUSDT": {
       "symbol": "LPTUSDT",
       "contract_type": "UM",
-      "current_funding_rate": "-0.00003418",
-      "funding_interval_hours": 1.0000002777777777,
-      "next_funding_time": "2025-07-13T18:00:00",
+      "current_funding_rate": "0.00001250",
+      "funding_interval_hours": 0.9999997222222222,
+      "next_funding_time": "2025-07-13T19:00:00",
       "history_rates": [
-        {
-          "symbol": "LPTUSDT",
-          "funding_time": 1752382800001,
-          "funding_rate": "0.00001250",
-          "mark_price": "6.55000000",
-          "raw": {
-            "symbol": "LPTUSDT",
-            "fundingTime": 1752382800001,
-            "fundingRate": "0.00001250",
-            "markPrice": "6.55000000"
-          }
-        },
         {
           "symbol": "LPTUSDT",
           "funding_time": 1752386400008,
@@ -207,29 +195,29 @@
             "fundingRate": "-0.00001094",
             "markPrice": "6.57935135"
           }
+        },
+        {
+          "symbol": "LPTUSDT",
+          "funding_time": 1752400800001,
+          "funding_rate": "-0.00001850",
+          "mark_price": "6.55677027",
+          "raw": {
+            "symbol": "LPTUSDT",
+            "fundingTime": 1752400800001,
+            "fundingRate": "-0.00001850",
+            "markPrice": "6.55677027"
+          }
         }
       ],
-      "last_updated": "2025-07-13T17:49:17.988390"
+      "last_updated": "2025-07-13T18:57:07.320389"
     },
     "AXLUSDT": {
       "symbol": "AXLUSDT",
       "contract_type": "UM",
       "current_funding_rate": "0.00001250",
-      "funding_interval_hours": 1.0000002777777777,
-      "next_funding_time": "2025-07-13T18:00:00",
+      "funding_interval_hours": 0.9999997222222222,
+      "next_funding_time": "2025-07-13T19:00:00",
       "history_rates": [
-        {
-          "symbol": "AXLUSDT",
-          "funding_time": 1752382800001,
-          "funding_rate": "0.00001250",
-          "mark_price": "0.35104490",
-          "raw": {
-            "symbol": "AXLUSDT",
-            "fundingTime": 1752382800001,
-            "fundingRate": "0.00001250",
-            "markPrice": "0.35104490"
-          }
-        },
         {
           "symbol": "AXLUSDT",
           "funding_time": 1752386400008,
@@ -277,29 +265,29 @@
             "fundingRate": "0.00001250",
             "markPrice": "0.35517718"
           }
+        },
+        {
+          "symbol": "AXLUSDT",
+          "funding_time": 1752400800001,
+          "funding_rate": "0.00001250",
+          "mark_price": "0.35216955",
+          "raw": {
+            "symbol": "AXLUSDT",
+            "fundingTime": 1752400800001,
+            "fundingRate": "0.00001250",
+            "markPrice": "0.35216955"
+          }
         }
       ],
-      "last_updated": "2025-07-13T17:49:57.354942"
+      "last_updated": "2025-07-13T18:57:44.336496"
     },
     "VOXELUSDT": {
       "symbol": "VOXELUSDT",
       "contract_type": "UM",
       "current_funding_rate": "0.00001250",
-      "funding_interval_hours": 1.0000002777777777,
-      "next_funding_time": "2025-07-13T18:00:00",
+      "funding_interval_hours": 0.9999997222222222,
+      "next_funding_time": "2025-07-13T19:00:00",
       "history_rates": [
-        {
-          "symbol": "VOXELUSDT",
-          "funding_time": 1752382800001,
-          "funding_rate": "0.00001250",
-          "mark_price": "0.05639769",
-          "raw": {
-            "symbol": "VOXELUSDT",
-            "fundingTime": 1752382800001,
-            "fundingRate": "0.00001250",
-            "markPrice": "0.05639769"
-          }
-        },
         {
           "symbol": "VOXELUSDT",
           "funding_time": 1752386400008,
@@ -347,16 +335,28 @@
             "fundingRate": "0.00001250",
             "markPrice": "0.05756463"
           }
+        },
+        {
+          "symbol": "VOXELUSDT",
+          "funding_time": 1752400800001,
+          "funding_rate": "0.00001250",
+          "mark_price": "0.05700462",
+          "raw": {
+            "symbol": "VOXELUSDT",
+            "fundingTime": 1752400800001,
+            "fundingRate": "0.00001250",
+            "markPrice": "0.05700462"
+          }
         }
       ],
-      "last_updated": "2025-07-13T17:50:09.285305"
+      "last_updated": "2025-07-13T18:57:56.083209"
     },
     "ALPACAUSDT": {
       "symbol": "ALPACAUSDT",
       "contract_type": "UM",
       "current_funding_rate": "0.00000000",
       "funding_interval_hours": 1.0,
-      "next_funding_time": "2025-07-13T18:00:00",
+      "next_funding_time": "2025-07-13T19:00:00",
       "history_rates": [
         {
           "symbol": "ALPACAUSDT",
@@ -419,27 +419,15 @@
           }
         }
       ],
-      "last_updated": "2025-07-13T17:50:10.255664"
+      "last_updated": "2025-07-13T18:57:57.134999"
     },
     "LAYERUSDT": {
       "symbol": "LAYERUSDT",
       "contract_type": "UM",
       "current_funding_rate": "0.00001250",
-      "funding_interval_hours": 1.0000002777777777,
-      "next_funding_time": "2025-07-13T18:00:00",
+      "funding_interval_hours": 0.9999997222222222,
+      "next_funding_time": "2025-07-13T19:00:00",
       "history_rates": [
-        {
-          "symbol": "LAYERUSDT",
-          "funding_time": 1752382800001,
-          "funding_rate": "0.00001250",
-          "mark_price": "0.68873383",
-          "raw": {
-            "symbol": "LAYERUSDT",
-            "fundingTime": 1752382800001,
-            "fundingRate": "0.00001250",
-            "markPrice": "0.68873383"
-          }
-        },
         {
           "symbol": "LAYERUSDT",
           "funding_time": 1752386400008,
@@ -487,29 +475,29 @@
             "fundingRate": "0.00001250",
             "markPrice": "0.68338130"
           }
+        },
+        {
+          "symbol": "LAYERUSDT",
+          "funding_time": 1752400800001,
+          "funding_rate": "0.00001250",
+          "mark_price": "0.67240000",
+          "raw": {
+            "symbol": "LAYERUSDT",
+            "fundingTime": 1752400800001,
+            "fundingRate": "0.00001250",
+            "markPrice": "0.67240000"
+          }
         }
       ],
-      "last_updated": "2025-07-13T17:50:37.366931"
+      "last_updated": "2025-07-13T18:58:24.143414"
     },
     "VICUSDT": {
       "symbol": "VICUSDT",
       "contract_type": "UM",
       "current_funding_rate": "0.00001250",
-      "funding_interval_hours": 1.0000002777777777,
-      "next_funding_time": "2025-07-13T18:00:00",
+      "funding_interval_hours": 0.9999997222222222,
+      "next_funding_time": "2025-07-13T19:00:00",
       "history_rates": [
-        {
-          "symbol": "VICUSDT",
-          "funding_time": 1752382800001,
-          "funding_rate": "0.00001250",
-          "mark_price": "0.31450000",
-          "raw": {
-            "symbol": "VICUSDT",
-            "fundingTime": 1752382800001,
-            "fundingRate": "0.00001250",
-            "markPrice": "0.31450000"
-          }
-        },
         {
           "symbol": "VICUSDT",
           "funding_time": 1752386400008,
@@ -557,29 +545,29 @@
             "fundingRate": "0.00001250",
             "markPrice": "0.31654904"
           }
+        },
+        {
+          "symbol": "VICUSDT",
+          "funding_time": 1752400800001,
+          "funding_rate": "0.00001250",
+          "mark_price": "0.31629783",
+          "raw": {
+            "symbol": "VICUSDT",
+            "fundingTime": 1752400800001,
+            "fundingRate": "0.00001250",
+            "markPrice": "0.31629783"
+          }
         }
       ],
-      "last_updated": "2025-07-13T17:50:41.194339"
+      "last_updated": "2025-07-13T18:58:28.134862"
     },
     "BROCCOLIF3BUSDT": {
       "symbol": "BROCCOLIF3BUSDT",
       "contract_type": "UM",
       "current_funding_rate": "0.00001250",
-      "funding_interval_hours": 1.0000002777777777,
-      "next_funding_time": "2025-07-13T18:00:00",
+      "funding_interval_hours": 0.9999997222222222,
+      "next_funding_time": "2025-07-13T19:00:00",
       "history_rates": [
-        {
-          "symbol": "BROCCOLIF3BUSDT",
-          "funding_time": 1752382800001,
-          "funding_rate": "0.00026856",
-          "mark_price": "0.00992000",
-          "raw": {
-            "symbol": "BROCCOLIF3BUSDT",
-            "fundingTime": 1752382800001,
-            "fundingRate": "0.00026856",
-            "markPrice": "0.00992000"
-          }
-        },
         {
           "symbol": "BROCCOLIF3BUSDT",
           "funding_time": 1752386400008,
@@ -627,29 +615,29 @@
             "fundingRate": "0.00001250",
             "markPrice": "0.00979223"
           }
+        },
+        {
+          "symbol": "BROCCOLIF3BUSDT",
+          "funding_time": 1752400800001,
+          "funding_rate": "0.00001250",
+          "mark_price": "0.00979233",
+          "raw": {
+            "symbol": "BROCCOLIF3BUSDT",
+            "fundingTime": 1752400800001,
+            "fundingRate": "0.00001250",
+            "markPrice": "0.00979233"
+          }
         }
       ],
-      "last_updated": "2025-07-13T17:50:43.430169"
+      "last_updated": "2025-07-13T18:58:30.786243"
     },
     "FUNUSDT": {
       "symbol": "FUNUSDT",
       "contract_type": "UM",
       "current_funding_rate": "0.00001250",
-      "funding_interval_hours": 1.0000002777777777,
-      "next_funding_time": "2025-07-13T18:00:00",
+      "funding_interval_hours": 0.9999997222222222,
+      "next_funding_time": "2025-07-13T19:00:00",
       "history_rates": [
-        {
-          "symbol": "FUNUSDT",
-          "funding_time": 1752382800001,
-          "funding_rate": "0.00001250",
-          "mark_price": "0.01670600",
-          "raw": {
-            "symbol": "FUNUSDT",
-            "fundingTime": 1752382800001,
-            "fundingRate": "0.00001250",
-            "markPrice": "0.01670600"
-          }
-        },
         {
           "symbol": "FUNUSDT",
           "funding_time": 1752386400008,
@@ -697,29 +685,29 @@
             "fundingRate": "0.00001250",
             "markPrice": "0.01718100"
           }
+        },
+        {
+          "symbol": "FUNUSDT",
+          "funding_time": 1752400800001,
+          "funding_rate": "0.00001250",
+          "mark_price": "0.01745600",
+          "raw": {
+            "symbol": "FUNUSDT",
+            "fundingTime": 1752400800001,
+            "fundingRate": "0.00001250",
+            "markPrice": "0.01745600"
+          }
         }
       ],
-      "last_updated": "2025-07-13T17:50:46.341985"
+      "last_updated": "2025-07-13T18:58:33.899246"
     },
     "WCTUSDT": {
       "symbol": "WCTUSDT",
       "contract_type": "UM",
       "current_funding_rate": "0.00001250",
-      "funding_interval_hours": 1.0000002777777777,
-      "next_funding_time": "2025-07-13T18:00:00",
+      "funding_interval_hours": 0.9999997222222222,
+      "next_funding_time": "2025-07-13T19:00:00",
       "history_rates": [
-        {
-          "symbol": "WCTUSDT",
-          "funding_time": 1752382800001,
-          "funding_rate": "-0.00000783",
-          "mark_price": "0.34120000",
-          "raw": {
-            "symbol": "WCTUSDT",
-            "fundingTime": 1752382800001,
-            "fundingRate": "-0.00000783",
-            "markPrice": "0.34120000"
-          }
-        },
         {
           "symbol": "WCTUSDT",
           "funding_time": 1752386400008,
@@ -767,29 +755,29 @@
             "fundingRate": "0.00001250",
             "markPrice": "0.33830000"
           }
+        },
+        {
+          "symbol": "WCTUSDT",
+          "funding_time": 1752400800001,
+          "funding_rate": "0.00001250",
+          "mark_price": "0.33850000",
+          "raw": {
+            "symbol": "WCTUSDT",
+            "fundingTime": 1752400800001,
+            "fundingRate": "0.00001250",
+            "markPrice": "0.33850000"
+          }
         }
       ],
-      "last_updated": "2025-07-13T17:50:50.222265"
+      "last_updated": "2025-07-13T18:58:40.378836"
     },
     "HYPERUSDT": {
       "symbol": "HYPERUSDT",
       "contract_type": "UM",
-      "current_funding_rate": "-0.00008020",
-      "funding_interval_hours": 1.0000002777777777,
-      "next_funding_time": "2025-07-13T18:00:00",
+      "current_funding_rate": "-0.00013040",
+      "funding_interval_hours": 0.9999997222222222,
+      "next_funding_time": "2025-07-13T19:00:00",
       "history_rates": [
-        {
-          "symbol": "HYPERUSDT",
-          "funding_time": 1752382800001,
-          "funding_rate": "-0.00017507",
-          "mark_price": "0.44640000",
-          "raw": {
-            "symbol": "HYPERUSDT",
-            "fundingTime": 1752382800001,
-            "fundingRate": "-0.00017507",
-            "markPrice": "0.44640000"
-          }
-        },
         {
           "symbol": "HYPERUSDT",
           "funding_time": 1752386400008,
@@ -837,29 +825,29 @@
             "fundingRate": "-0.00007405",
             "markPrice": "0.41520000"
           }
+        },
+        {
+          "symbol": "HYPERUSDT",
+          "funding_time": 1752400800001,
+          "funding_rate": "0.00001250",
+          "mark_price": "0.41774121",
+          "raw": {
+            "symbol": "HYPERUSDT",
+            "fundingTime": 1752400800001,
+            "fundingRate": "0.00001250",
+            "markPrice": "0.41774121"
+          }
         }
       ],
-      "last_updated": "2025-07-13T17:50:51.983149"
+      "last_updated": "2025-07-13T18:58:42.587336"
     },
     "SIGNUSDT": {
       "symbol": "SIGNUSDT",
       "contract_type": "UM",
       "current_funding_rate": "0.00001250",
-      "funding_interval_hours": 1.0000002777777777,
-      "next_funding_time": "2025-07-13T18:00:00",
+      "funding_interval_hours": 0.9999997222222222,
+      "next_funding_time": "2025-07-13T19:00:00",
       "history_rates": [
-        {
-          "symbol": "SIGNUSDT",
-          "funding_time": 1752382800001,
-          "funding_rate": "0.00001250",
-          "mark_price": "0.07076738",
-          "raw": {
-            "symbol": "SIGNUSDT",
-            "fundingTime": 1752382800001,
-            "fundingRate": "0.00001250",
-            "markPrice": "0.07076738"
-          }
-        },
         {
           "symbol": "SIGNUSDT",
           "funding_time": 1752386400008,
@@ -907,29 +895,29 @@
             "fundingRate": "0.00001250",
             "markPrice": "0.07099581"
           }
+        },
+        {
+          "symbol": "SIGNUSDT",
+          "funding_time": 1752400800001,
+          "funding_rate": "0.00001250",
+          "mark_price": "0.07049254",
+          "raw": {
+            "symbol": "SIGNUSDT",
+            "fundingTime": 1752400800001,
+            "fundingRate": "0.00001250",
+            "markPrice": "0.07049254"
+          }
         }
       ],
-      "last_updated": "2025-07-13T17:50:53.312426"
+      "last_updated": "2025-07-13T18:58:44.342146"
     },
     "SOPHUSDT": {
       "symbol": "SOPHUSDT",
       "contract_type": "UM",
       "current_funding_rate": "0.00001250",
-      "funding_interval_hours": 1.0000002777777777,
-      "next_funding_time": "2025-07-13T18:00:00",
+      "funding_interval_hours": 0.9999997222222222,
+      "next_funding_time": "2025-07-13T19:00:00",
       "history_rates": [
-        {
-          "symbol": "SOPHUSDT",
-          "funding_time": 1752382800001,
-          "funding_rate": "0.00001250",
-          "mark_price": "0.03672400",
-          "raw": {
-            "symbol": "SOPHUSDT",
-            "fundingTime": 1752382800001,
-            "fundingRate": "0.00001250",
-            "markPrice": "0.03672400"
-          }
-        },
         {
           "symbol": "SOPHUSDT",
           "funding_time": 1752386400008,
@@ -977,29 +965,29 @@
             "fundingRate": "0.00001250",
             "markPrice": "0.03634900"
           }
+        },
+        {
+          "symbol": "SOPHUSDT",
+          "funding_time": 1752400800001,
+          "funding_rate": "0.00001250",
+          "mark_price": "0.03610600",
+          "raw": {
+            "symbol": "SOPHUSDT",
+            "fundingTime": 1752400800001,
+            "fundingRate": "0.00001250",
+            "markPrice": "0.03610600"
+          }
         }
       ],
-      "last_updated": "2025-07-13T17:50:59.909313"
+      "last_updated": "2025-07-13T18:58:53.057389"
     },
     "LAUSDT": {
       "symbol": "LAUSDT",
       "contract_type": "UM",
       "current_funding_rate": "0.00001250",
-      "funding_interval_hours": 1.0000002777777777,
-      "next_funding_time": "2025-07-13T18:00:00",
+      "funding_interval_hours": 0.9999997222222222,
+      "next_funding_time": "2025-07-13T19:00:00",
       "history_rates": [
-        {
-          "symbol": "LAUSDT",
-          "funding_time": 1752382800001,
-          "funding_rate": "0.00001250",
-          "mark_price": "0.33979199",
-          "raw": {
-            "symbol": "LAUSDT",
-            "fundingTime": 1752382800001,
-            "fundingRate": "0.00001250",
-            "markPrice": "0.33979199"
-          }
-        },
         {
           "symbol": "LAUSDT",
           "funding_time": 1752386400008,
@@ -1047,29 +1035,29 @@
             "fundingRate": "0.00001250",
             "markPrice": "0.33931255"
           }
+        },
+        {
+          "symbol": "LAUSDT",
+          "funding_time": 1752400800001,
+          "funding_rate": "0.00001250",
+          "mark_price": "0.34049220",
+          "raw": {
+            "symbol": "LAUSDT",
+            "fundingTime": 1752400800001,
+            "fundingRate": "0.00001250",
+            "markPrice": "0.34049220"
+          }
         }
       ],
-      "last_updated": "2025-07-13T17:51:03.518948"
+      "last_updated": "2025-07-13T18:58:56.591964"
     },
     "MYXUSDT": {
       "symbol": "MYXUSDT",
       "contract_type": "UM",
-      "current_funding_rate": "-0.00195701",
-      "funding_interval_hours": 1.0000002777777777,
-      "next_funding_time": "2025-07-13T18:00:00",
+      "current_funding_rate": "-0.00500796",
+      "funding_interval_hours": 0.9999997222222222,
+      "next_funding_time": "2025-07-13T19:00:00",
       "history_rates": [
-        {
-          "symbol": "MYXUSDT",
-          "funding_time": 1752382800001,
-          "funding_rate": "-0.00083201",
-          "mark_price": "0.09209798",
-          "raw": {
-            "symbol": "MYXUSDT",
-            "fundingTime": 1752382800001,
-            "fundingRate": "-0.00083201",
-            "markPrice": "0.09209798"
-          }
-        },
         {
           "symbol": "MYXUSDT",
           "funding_time": 1752386400008,
@@ -1117,29 +1105,29 @@
             "fundingRate": "-0.00083454",
             "markPrice": "0.09307570"
           }
+        },
+        {
+          "symbol": "MYXUSDT",
+          "funding_time": 1752400800001,
+          "funding_rate": "-0.00213213",
+          "mark_price": "0.09164730",
+          "raw": {
+            "symbol": "MYXUSDT",
+            "fundingTime": 1752400800001,
+            "fundingRate": "-0.00213213",
+            "markPrice": "0.09164730"
+          }
         }
       ],
-      "last_updated": "2025-07-13T17:51:06.833111"
+      "last_updated": "2025-07-13T18:58:59.400164"
     },
     "NEWTUSDT": {
       "symbol": "NEWTUSDT",
       "contract_type": "UM",
-      "current_funding_rate": "-0.00007490",
-      "funding_interval_hours": 1.0000002777777777,
-      "next_funding_time": "2025-07-13T18:00:00",
+      "current_funding_rate": "0.00000701",
+      "funding_interval_hours": 0.9999997222222222,
+      "next_funding_time": "2025-07-13T19:00:00",
       "history_rates": [
-        {
-          "symbol": "NEWTUSDT",
-          "funding_time": 1752382800001,
-          "funding_rate": "-0.00001358",
-          "mark_price": "0.30800000",
-          "raw": {
-            "symbol": "NEWTUSDT",
-            "fundingTime": 1752382800001,
-            "fundingRate": "-0.00001358",
-            "markPrice": "0.30800000"
-          }
-        },
         {
           "symbol": "NEWTUSDT",
           "funding_time": 1752386400008,
@@ -1187,29 +1175,29 @@
             "fundingRate": "-0.00020171",
             "markPrice": "0.30800000"
           }
+        },
+        {
+          "symbol": "NEWTUSDT",
+          "funding_time": 1752400800001,
+          "funding_rate": "-0.00009702",
+          "mark_price": "0.30757859",
+          "raw": {
+            "symbol": "NEWTUSDT",
+            "fundingTime": 1752400800001,
+            "fundingRate": "-0.00009702",
+            "markPrice": "0.30757859"
+          }
         }
       ],
-      "last_updated": "2025-07-13T17:51:08.094558"
+      "last_updated": "2025-07-13T18:59:00.308817"
     },
     "HUSDT": {
       "symbol": "HUSDT",
       "contract_type": "UM",
       "current_funding_rate": "0.00001250",
-      "funding_interval_hours": 1.0000002777777777,
-      "next_funding_time": "2025-07-13T18:00:00",
+      "funding_interval_hours": 0.9999997222222222,
+      "next_funding_time": "2025-07-13T19:00:00",
       "history_rates": [
-        {
-          "symbol": "HUSDT",
-          "funding_time": 1752382800001,
-          "funding_rate": "0.00001250",
-          "mark_price": "0.04677000",
-          "raw": {
-            "symbol": "HUSDT",
-            "fundingTime": 1752382800001,
-            "fundingRate": "0.00001250",
-            "markPrice": "0.04677000"
-          }
-        },
         {
           "symbol": "HUSDT",
           "funding_time": 1752386400008,
@@ -1257,29 +1245,29 @@
             "fundingRate": "0.00001250",
             "markPrice": "0.04801000"
           }
+        },
+        {
+          "symbol": "HUSDT",
+          "funding_time": 1752400800001,
+          "funding_rate": "0.00001250",
+          "mark_price": "0.04814833",
+          "raw": {
+            "symbol": "HUSDT",
+            "fundingTime": 1752400800001,
+            "fundingRate": "0.00001250",
+            "markPrice": "0.04814833"
+          }
         }
       ],
-      "last_updated": "2025-07-13T17:51:09.128752"
+      "last_updated": "2025-07-13T18:59:01.329783"
     },
     "SAHARAUSDT": {
       "symbol": "SAHARAUSDT",
       "contract_type": "UM",
       "current_funding_rate": "0.00001250",
-      "funding_interval_hours": 1.0000002777777777,
-      "next_funding_time": "2025-07-13T18:00:00",
+      "funding_interval_hours": 0.9999997222222222,
+      "next_funding_time": "2025-07-13T19:00:00",
       "history_rates": [
-        {
-          "symbol": "SAHARAUSDT",
-          "funding_time": 1752382800001,
-          "funding_rate": "0.00001250",
-          "mark_price": "0.07247529",
-          "raw": {
-            "symbol": "SAHARAUSDT",
-            "fundingTime": 1752382800001,
-            "fundingRate": "0.00001250",
-            "markPrice": "0.07247529"
-          }
-        },
         {
           "symbol": "SAHARAUSDT",
           "funding_time": 1752386400008,
@@ -1327,29 +1315,29 @@
             "fundingRate": "0.00001250",
             "markPrice": "0.07310000"
           }
+        },
+        {
+          "symbol": "SAHARAUSDT",
+          "funding_time": 1752400800001,
+          "funding_rate": "0.00001250",
+          "mark_price": "0.07301170",
+          "raw": {
+            "symbol": "SAHARAUSDT",
+            "fundingTime": 1752400800001,
+            "fundingRate": "0.00001250",
+            "markPrice": "0.07301170"
+          }
         }
       ],
-      "last_updated": "2025-07-13T17:51:10.116233"
+      "last_updated": "2025-07-13T18:59:02.435331"
     },
     "MUSDT": {
       "symbol": "MUSDT",
       "contract_type": "UM",
-      "current_funding_rate": "0.00001250",
-      "funding_interval_hours": 1.0000002777777777,
-      "next_funding_time": "2025-07-13T18:00:00",
+      "current_funding_rate": "0.00006443",
+      "funding_interval_hours": 0.9999997222222222,
+      "next_funding_time": "2025-07-13T19:00:00",
       "history_rates": [
-        {
-          "symbol": "MUSDT",
-          "funding_time": 1752382800001,
-          "funding_rate": "0.00001250",
-          "mark_price": "0.57090000",
-          "raw": {
-            "symbol": "MUSDT",
-            "fundingTime": 1752382800001,
-            "fundingRate": "0.00001250",
-            "markPrice": "0.57090000"
-          }
-        },
         {
           "symbol": "MUSDT",
           "funding_time": 1752386400008,
@@ -1397,9 +1385,21 @@
             "fundingRate": "0.00001250",
             "markPrice": "0.58154253"
           }
+        },
+        {
+          "symbol": "MUSDT",
+          "funding_time": 1752400800001,
+          "funding_rate": "0.00001250",
+          "mark_price": "0.59841159",
+          "raw": {
+            "symbol": "MUSDT",
+            "fundingTime": 1752400800001,
+            "fundingRate": "0.00001250",
+            "markPrice": "0.59841159"
+          }
         }
       ],
-      "last_updated": "2025-07-13T17:51:11.711551"
+      "last_updated": "2025-07-13T18:59:03.798566"
     }
   },
   "total_scanned": 525,

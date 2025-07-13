@@ -4,13 +4,18 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date
 import json
+import threading
+import time
+import traceback
 
 from utils.models import Strategy, Backtest, Trade, SessionLocal, get_db
 from strategies.factory import StrategyFactory
+from strategies.funding_rate_arbitrage import FundingRateArbitrageStrategy
 from backtest.engine import BacktestEngine, BacktestManager
 from trading.manager import TradingManager, trading_manager
 from data.manager import data_manager
 from config.settings import settings
+from utils.notifier import send_telegram_message
 
 app = FastAPI(title="量化交易系统", version="1.0.0")
 
@@ -52,6 +57,56 @@ class TradingRequest(BaseModel):
     trade_type: str = "paper"  # paper 或 live
     parameters: Optional[Dict[str, Any]] = None
 
+class FundingArbitrageRequest(BaseModel):
+    parameters: Optional[Dict[str, Any]] = None
+
+# 全局资金费率套利策略实例
+funding_strategy_instance = None
+funding_strategy_thread = None
+funding_strategy_running = False
+
+def create_funding_strategy(params: dict = None):
+    """创建资金费率套利策略实例"""
+    global funding_strategy_instance
+    
+    default_params = {
+        'funding_rate_threshold': 0.005,
+        'max_positions': 20,
+        'min_volume': 1000000,
+        'position_size_ratio': 0.05,
+        'max_total_exposure': 0.8,
+        'stop_loss_ratio': 0.05,
+        'take_profit_ratio': 0.10,
+        'auto_trade': True,
+        'paper_trading': True,
+        'min_position_hold_time': 3600
+    }
+    
+    if params:
+        default_params.update(params)
+    
+    funding_strategy_instance = FundingRateArbitrageStrategy(default_params)
+    return funding_strategy_instance
+
+def funding_strategy_monitor_loop():
+    """资金费率套利策略监控循环"""
+    global funding_strategy_running, funding_strategy_instance
+    
+    while funding_strategy_running:
+        try:
+            if funding_strategy_instance:
+                # 获取策略状态
+                status = funding_strategy_instance.get_pool_status()
+                
+                # 这里可以添加更多的监控逻辑
+                # 比如检查策略是否正常运行，发送定期报告等
+                
+            time.sleep(60)  # 每分钟检查一次
+            
+        except Exception as e:
+            print(f"资金费率策略监控错误: {e}")
+            time.sleep(30)
+
 # 策略管理API
 @app.get("/strategies", response_model=List[Dict[str, Any]])
 def get_strategies(db: SessionLocal = Depends(get_db)):
@@ -72,6 +127,7 @@ def get_strategies(db: SessionLocal = Depends(get_db)):
             for s in strategies
         ]
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取策略失败: {str(e)}")
 
 @app.get("/strategies/available")
@@ -89,6 +145,7 @@ def get_available_strategies():
             ]
         }
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取可用策略失败: {str(e)}")
 
 @app.post("/strategies", response_model=Dict[str, Any])
@@ -129,6 +186,7 @@ def create_strategy(strategy: StrategyCreate, db: SessionLocal = Depends(get_db)
     except HTTPException:
         raise
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         db.rollback()
         raise HTTPException(status_code=500, detail=f"创建策略失败: {str(e)}")
 
@@ -167,6 +225,7 @@ def update_strategy(strategy_id: int, strategy_update: StrategyUpdate,
     except HTTPException:
         raise
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         db.rollback()
         raise HTTPException(status_code=500, detail=f"更新策略失败: {str(e)}")
 
@@ -186,6 +245,7 @@ def delete_strategy(strategy_id: int, db: SessionLocal = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         db.rollback()
         raise HTTPException(status_code=500, detail=f"删除策略失败: {str(e)}")
 
@@ -233,6 +293,7 @@ def run_funding_arbitrage(strategy_id: int, db: SessionLocal = Depends(get_db)):
         }
         
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"策略运行失败: {str(e)}")
 
 @app.post("/strategies/{strategy_id}/update-cache")
@@ -262,6 +323,7 @@ def update_funding_cache(strategy_id: int, db: SessionLocal = Depends(get_db)):
         }
         
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"缓存更新失败: {str(e)}")
 
 @app.get("/strategies/{strategy_id}/cache-status")
@@ -299,6 +361,7 @@ def get_cache_status(strategy_id: int, db: SessionLocal = Depends(get_db)):
         }
         
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取缓存状态失败: {str(e)}")
 
 # 回测API
@@ -330,16 +393,24 @@ def run_backtest(backtest_request: BacktestRequest, background_tasks: Background
             backtest_request.timeframe
         )
         
+        # 返回简化的结果，包含权益曲线数据
         return {
-            "backtest_id": results['backtest_id'],
-            "results": results['results'],
-            "total_trades": len(results['trades']),
-            "equity_curve_points": len(results['equity_curve'])
+            "backtest_id": results.get('backtest_id', 0),
+            "results": {
+                "total_return": results['results'].get('total_return', 0.0),
+                "max_drawdown": results['results'].get('max_drawdown', 0.0),
+                "sharpe_ratio": results['results'].get('sharpe_ratio', 0.0),
+                "win_rate": results['results'].get('win_rate', 0.0),
+                "total_trades": results['results'].get('total_trades', 0)
+            },
+            "trades": results.get('trades', []),
+            "equity_curve": results.get('equity_curve', [])
         }
         
     except HTTPException:
         raise
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"回测失败: {str(e)}")
 
 @app.get("/backtest/{backtest_id}", response_model=Dict[str, Any])
@@ -371,6 +442,7 @@ def get_backtest(backtest_id: int, db: SessionLocal = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取回测结果失败: {str(e)}")
 
 @app.get("/backtest/{backtest_id}/trades", response_model=List[Dict[str, Any]])
@@ -397,6 +469,7 @@ def get_backtest_trades(backtest_id: int, db: SessionLocal = Depends(get_db)):
         ]
         
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取交易记录失败: {str(e)}")
 
 @app.get("/backtests", response_model=List[Dict[str, Any]])
@@ -429,6 +502,7 @@ def list_backtests(strategy_id: Optional[int] = None, db: SessionLocal = Depends
         ]
         
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取回测列表失败: {str(e)}")
 
 # 交易API
@@ -459,6 +533,7 @@ def create_trading_engine(request: TradingRequest):
         }
         
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"创建交易引擎失败: {str(e)}")
 
 @app.post("/trading/run", response_model=Dict[str, Any])
@@ -493,6 +568,7 @@ def run_trading(request: TradingRequest):
     except HTTPException:
         raise
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"运行交易策略失败: {str(e)}")
 
 @app.get("/trading/engines", response_model=List[str])
@@ -501,6 +577,7 @@ def list_trading_engines():
     try:
         return trading_manager.list_engines()
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取交易引擎列表失败: {str(e)}")
 
 @app.get("/trading/engine/{engine_name}/account", response_model=Dict[str, Any])
@@ -516,6 +593,7 @@ def get_account_summary(engine_name: str):
     except HTTPException:
         raise
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取账户摘要失败: {str(e)}")
 
 @app.get("/trading/engine/{engine_name}/positions", response_model=List[Dict[str, Any]])
@@ -531,6 +609,7 @@ def get_positions(engine_name: str):
     except HTTPException:
         raise
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取持仓信息失败: {str(e)}")
 
 @app.get("/trading/trades", response_model=List[Dict[str, Any]])
@@ -560,6 +639,7 @@ def get_trade_history(symbol: Optional[str] = None, limit: int = 100,
         ]
         
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取交易历史失败: {str(e)}")
 
 # 数据API
@@ -569,6 +649,7 @@ def get_symbols():
     try:
         return data_manager.get_symbols()
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取交易对列表失败: {str(e)}")
 
 @app.get("/data/{symbol}/price")
@@ -584,6 +665,7 @@ def get_latest_price(symbol: str):
     except HTTPException:
         raise
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取价格失败: {str(e)}")
 
 @app.post("/data/{symbol}/update")
@@ -593,6 +675,7 @@ def update_market_data(symbol: str, timeframe: str = "1d"):
         data_manager.update_market_data(symbol, timeframe)
         return {"message": f"成功更新 {symbol} 的 {timeframe} 数据"}
     except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"更新市场数据失败: {str(e)}")
 
 # 系统状态API
@@ -612,6 +695,294 @@ def get_config():
         "take_profit_ratio": settings.TAKE_PROFIT_RATIO,
         "supported_exchanges": list(settings.SUPPORTED_EXCHANGES.keys()),
         "timeframes": list(settings.TIMEFRAMES.keys())
+    }
+
+# 资金费率套利API
+@app.get("/funding-arbitrage/status")
+def get_funding_strategy_status():
+    """获取资金费率套利策略状态"""
+    global funding_strategy_instance, funding_strategy_running
+    
+    try:
+        if not funding_strategy_instance:
+            return {
+                'status': 'success',
+                'data': {
+                    'status': 'not_initialized',
+                    'message': '策略未初始化'
+                }
+            }
+        
+        pool_status = funding_strategy_instance.get_pool_status()
+        positions = funding_strategy_instance.get_positions()
+        
+        # 格式化持仓信息
+        formatted_positions = []
+        for symbol, pos in positions.items():
+            formatted_positions.append({
+                'symbol': pos.symbol,
+                'side': pos.side,
+                'quantity': pos.quantity,
+                'entry_price': pos.entry_price,
+                'entry_time': pos.entry_time.isoformat(),
+                'funding_rate': pos.funding_rate,
+                'unrealized_pnl': pos.unrealized_pnl,
+                'realized_pnl': pos.realized_pnl
+            })
+        
+        return {
+            'status': 'success',
+            'data': {
+                'status': 'running' if funding_strategy_running else 'stopped',
+                'strategy_name': funding_strategy_instance.name,
+                'pool_status': pool_status,
+                'positions': formatted_positions,
+                'timestamp': datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"获取策略状态失败: {str(e)}")
+
+@app.get("/funding-arbitrage/pool-status")
+def get_funding_pool_status():
+    """获取资金费率套利池子状态"""
+    global funding_strategy_instance
+    
+    try:
+        if not funding_strategy_instance:
+            raise HTTPException(status_code=400, detail="策略未初始化")
+        
+        pool_status = funding_strategy_instance.get_pool_status()
+        
+        return {
+            'status': 'success',
+            'data': pool_status
+        }
+        
+    except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"获取池子状态失败: {str(e)}")
+
+@app.post("/funding-arbitrage/start")
+def start_funding_strategy(request: FundingArbitrageRequest = None):
+    """启动资金费率套利策略"""
+    global funding_strategy_instance, funding_strategy_thread, funding_strategy_running
+    
+    try:
+        if request is None:
+            request = FundingArbitrageRequest()
+        
+        # 创建策略实例
+        funding_strategy_instance = create_funding_strategy(request.parameters)
+        
+        # 启动策略（放到新线程中，避免阻塞API）
+        def start_strategy_thread():
+            funding_strategy_instance.start_strategy()
+        strategy_thread = threading.Thread(target=start_strategy_thread, daemon=True)
+        strategy_thread.start()
+        
+        # 启动策略监控线程
+        funding_strategy_running = True
+        funding_strategy_thread = threading.Thread(target=funding_strategy_monitor_loop, daemon=True)
+        funding_strategy_thread.start()
+        
+        # 发送启动通知
+        start_message = f"🚀 资金费率套利策略已启动\n"
+        start_message += f"⏰ 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        start_message += f"📊 策略: {funding_strategy_instance.name}\n"
+        start_message += f"🎯 资金费率阈值: {funding_strategy_instance.parameters['funding_rate_threshold']:.4%}\n"
+        start_message += f"📈 最大持仓: {funding_strategy_instance.parameters['max_positions']}个\n"
+        start_message += f"💰 仓位比例: {funding_strategy_instance.parameters['position_size_ratio']:.1%}\n"
+        start_message += f"📱 交易模式: {'模拟交易' if funding_strategy_instance.parameters['paper_trading'] else '实盘交易'}\n"
+        start_message += f"⏰ 更新模式: 整点定时更新"
+        
+        send_telegram_message(start_message)
+        
+        return {
+            'status': 'success',
+            'message': '策略启动成功，等待整点开始定时更新',
+            'strategy_name': funding_strategy_instance.name
+        }
+        
+    except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"启动策略失败: {str(e)}")
+
+@app.post("/funding-arbitrage/stop")
+def stop_funding_strategy():
+    """停止资金费率套利策略"""
+    global funding_strategy_running, funding_strategy_instance
+    
+    try:
+        funding_strategy_running = False
+        
+        if funding_strategy_instance:
+            # 停止策略
+            funding_strategy_instance.stop_strategy()
+            
+            # 发送停止通知
+            status = funding_strategy_instance.get_pool_status()
+            stop_message = f"🛑 资金费率套利策略已停止\n"
+            stop_message += f"⏰ 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            stop_message += f"📊 最终状态:\n"
+            stop_message += f"  总盈亏: {status['total_pnl']:.2f}\n"
+            stop_message += f"  总交易: {status['total_trades']}次\n"
+            stop_message += f"  胜率: {status['win_rate']:.1%}\n"
+            stop_message += f"  当前持仓: {status['current_positions']}个"
+            
+            send_telegram_message(stop_message)
+        
+        return {
+            'status': 'success',
+            'message': '策略停止成功'
+        }
+        
+    except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"停止策略失败: {str(e)}")
+
+@app.get("/funding-arbitrage/positions")
+def get_funding_positions():
+    """获取资金费率套利当前持仓"""
+    global funding_strategy_instance
+    
+    try:
+        if not funding_strategy_instance:
+            raise HTTPException(status_code=400, detail="策略未初始化")
+        
+        positions = funding_strategy_instance.get_positions()
+        formatted_positions = []
+        
+        for symbol, pos in positions.items():
+            formatted_positions.append({
+                'symbol': pos.symbol,
+                'side': pos.side,
+                'quantity': pos.quantity,
+                'entry_price': pos.entry_price,
+                'entry_time': pos.entry_time.isoformat(),
+                'funding_rate': pos.funding_rate,
+                'unrealized_pnl': pos.unrealized_pnl,
+                'realized_pnl': pos.realized_pnl
+            })
+        
+        return {
+            'status': 'success',
+            'positions': formatted_positions,
+            'count': len(formatted_positions)
+        }
+        
+    except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"获取持仓失败: {str(e)}")
+
+@app.post("/funding-arbitrage/close-all")
+def close_all_funding_positions():
+    """平掉所有资金费率套利持仓"""
+    global funding_strategy_instance
+    
+    try:
+        if not funding_strategy_instance:
+            raise HTTPException(status_code=400, detail="策略未初始化")
+        
+        # 平掉所有持仓
+        closed_positions = funding_strategy_instance.close_all_positions()
+        # 发送通知
+        close_message = f"📊 平仓操作完成\n"
+        close_message += f"⏰ 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        close_message += f"📈 平仓数量: {len(closed_positions)}个\n"
+        if closed_positions:
+            close_message += f"📋 平仓详情:\n"
+            for pos in closed_positions:
+                if isinstance(pos, dict):
+                    close_message += f"  {pos['symbol']}: {pos['side']} {pos['quantity']:.4f} @ {pos['entry_price']:.4f}\n"
+                else:
+                    close_message += f"  [异常持仓数据]: {pos}\n"
+        send_telegram_message(close_message)
+        return {
+            'status': 'success',
+            'message': '平仓操作完成',
+            'closed_positions': closed_positions
+        }
+        
+    except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"平仓失败: {str(e)}")
+
+@app.post("/funding-arbitrage/update-cache")
+def update_funding_cache():
+    """更新资金费率套利缓存"""
+    global funding_strategy_instance
+    
+    try:
+        if not funding_strategy_instance:
+            raise HTTPException(status_code=400, detail="策略未初始化")
+        
+        # 强制更新缓存
+        update_result = funding_strategy_instance.force_update_cache()
+        
+        return {
+            'status': 'success',
+            'message': '缓存更新成功',
+            'update_result': update_result,
+            'pool_status': funding_strategy_instance.get_pool_status()
+        }
+        
+    except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"缓存更新失败: {str(e)}")
+
+@app.get("/funding-arbitrage/parameters")
+def get_funding_parameters():
+    """获取资金费率套利策略参数"""
+    global funding_strategy_instance
+    
+    try:
+        if not funding_strategy_instance:
+            raise HTTPException(status_code=400, detail="策略未初始化")
+        
+        return {
+            'status': 'success',
+            'parameters': funding_strategy_instance.parameters
+        }
+        
+    except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"获取参数失败: {str(e)}")
+
+@app.put("/funding-arbitrage/parameters")
+def update_funding_parameters(request: FundingArbitrageRequest):
+    """更新资金费率套利策略参数"""
+    global funding_strategy_instance
+    
+    try:
+        if not funding_strategy_instance:
+            raise HTTPException(status_code=400, detail="策略未初始化")
+        
+        if request.parameters:
+            funding_strategy_instance.update_parameters(request.parameters)
+        
+        return {
+            'status': 'success',
+            'message': '参数更新成功',
+            'parameters': funding_strategy_instance.parameters
+        }
+        
+    except Exception as e:
+        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"更新参数失败: {str(e)}")
+
+@app.get("/funding-arbitrage/health")
+def funding_health_check():
+    """资金费率套利健康检查"""
+    global funding_strategy_instance, funding_strategy_running
+    
+    return {
+        "status": "healthy",
+        "strategy_running": funding_strategy_running,
+        "strategy_initialized": funding_strategy_instance is not None,
+        "timestamp": datetime.now().isoformat()
     }
 
 if __name__ == "__main__":

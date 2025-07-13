@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 import os
 import json
+import requests
 
 class BinanceFunding:
     def __init__(self):
@@ -91,15 +92,36 @@ class BinanceFunding:
             return datetime.fromtimestamp(info['next_funding_time']/1000)
         return None
 
+    def get_24h_volume(self, symbol: str, contract_type: str = "UM") -> float:
+        """获取24小时成交量"""
+        if not self.available:
+            return 0.0
+        try:
+            if contract_type == "UM":
+                res = self.um.market.get_ticker_24hr(symbol=symbol)
+            else:
+                res = self.cm.market.get_ticker_24hr(symbol=symbol)
+            if res and res.get('code') == 200:
+                data = self._parse_single(res['data'])
+                return float(data.get('volume', 0))
+            return 0.0
+        except Exception as e:
+            print(f"❌ 获取24小时成交量失败: {e}")
+            return 0.0
+
     def get_comprehensive_info(self, symbol: str, contract_type: str = "UM") -> dict:
         current = self.get_current_funding(symbol, contract_type)
         history = self.get_funding_history(symbol, contract_type, limit=5)
         interval = self.detect_funding_interval(symbol, contract_type)
         next_time = self.get_next_funding_time(symbol, contract_type)
+        volume_24h = self.get_24h_volume(symbol, contract_type)
         return {
             'symbol': symbol,
             'contract_type': contract_type,
             'current_funding_rate': current['funding_rate'] if current else None,
+            'mark_price': current['mark_price'] if current else None,
+            'index_price': current['index_price'] if current else None,
+            'volume_24h': volume_24h,
             'funding_interval_hours': interval,
             'next_funding_time': next_time.isoformat() if next_time else None,
             'history_rates': history,
@@ -281,6 +303,24 @@ class BinanceFunding:
             return {}
         with open(path, 'r', encoding='utf-8') as f:
             return json.load(f)
+
+def get_all_funding_rates():
+    """批量获取所有合约的资金费率等信息，返回symbol到资金费率等信息的映射"""
+    url = "https://fapi.binance.com/fapi/v1/premiumIndex"
+    resp = requests.get(url, timeout=10)
+    resp.raise_for_status()
+    data = resp.json()
+    # 构建symbol到资金费率等信息的映射
+    data_map = {item['symbol']: item for item in data}
+    return data_map
+
+def get_all_24h_volumes():
+    """批量获取所有合约的24小时成交额（USDT计价），返回symbol到成交额的映射"""
+    url = "https://fapi.binance.com/fapi/v1/ticker/24hr"
+    resp = requests.get(url, timeout=10)
+    resp.raise_for_status()
+    data = resp.json()
+    return {item['symbol']: float(item['quoteVolume']) for item in data}
 
 # 测试
 if __name__ == "__main__":
