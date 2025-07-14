@@ -50,8 +50,8 @@ class FundingRateArbitrageStrategy(BaseStrategy):
                         'cache_duration': config_data.get('cache_settings', {}).get('pool_cache_duration', 7200),
                         'update_interval': config_data.get('scan_interval_seconds', 1800),
                         'funding_interval': 28800,  # 资金费率结算周期（秒，8小时）
-                        'contract_refresh_interval': 3600, # 合约池刷新间隔（秒，1小时）
-                        'funding_rate_check_interval': 300, # 资金费率检测间隔（秒，5分钟）
+                        'contract_refresh_interval': 60, # 合约池刷新间隔（秒，1小时）
+                        'funding_rate_check_interval': 30, # 资金费率检测间隔（秒，5分钟）
                         'position_size_ratio': 0.05,      # 每个仓位占总资金的比例
                         'max_total_exposure': 0.8,        # 最大总敞口比例
                         'stop_loss_ratio': 0.05,          # 止损比例
@@ -72,8 +72,8 @@ class FundingRateArbitrageStrategy(BaseStrategy):
             'cache_duration': 7200,           # 缓存时间（秒）
             'update_interval': 1800,          # 更新间隔（秒，30分钟）
             'funding_interval': 28800,        # 资金费率结算周期（秒，8小时）
-            'contract_refresh_interval': 3600, # 合约池刷新间隔（秒，1小时）
-            'funding_rate_check_interval': 300, # 资金费率检测间隔（秒，5分钟）
+            'contract_refresh_interval': 60, # 合约池刷新间隔（秒，1小时）
+            'funding_rate_check_interval': 30, # 资金费率检测间隔（秒，5分钟）
             'position_size_ratio': 0.05,      # 每个仓位占总资金的比例
             'max_total_exposure': 0.8,        # 最大总敞口比例
             'stop_loss_ratio': 0.05,          # 止损比例
@@ -333,31 +333,54 @@ class FundingRateArbitrageStrategy(BaseStrategy):
         print(f"✅ 合约池刷新完成，找到 {len(qualified_contracts)} 个符合条件的合约")
 
     def _start_funding_rate_check_thread(self):
-        """启动资金费率检测线程 - 每5分钟检测一次"""
+        print(">>> 启动资金费率检测线程")
         def funding_rate_check_loop():
+            print(">>> 进入funding_rate_check_loop循环体")
             while self._update_threads_started:
                 try:
-                    print("🔍 定时检测资金费率...")
+                    print(f"🔍 [{datetime.now()}] 定时检测资金费率...")
                     self._check_funding_rates_and_trade()
                     time.sleep(self.parameters['funding_rate_check_interval'])
                 except Exception as e:
                     print(f"❌ 资金费率检测失败: {e}")
-                    time.sleep(60)  # 出错后1分钟再试
+                    time.sleep(60)
         t = threading.Thread(target=funding_rate_check_loop, daemon=True)
         t.start()
 
     def _check_funding_rates_and_trade(self):
-        """检测资金费率并执行交易"""
-        print("📊 检测资金费率并更新合约池...")
-        
-        # 获取当前缓存的所有合约信息
-        funding_rates = self.get_funding_rates()
-        
-        if not funding_rates:
-            print("⚠️ 没有合约信息，跳过检测")
+        """检测资金费率并执行交易（每次都获取最新数据，不用缓存）"""
+        print("📊 检测资金费率并更新合约池（实时获取最新数据）...")
+        from utils.binance_funding import get_all_funding_rates, get_all_24h_volumes
+        # 1. 加载候选池（所有1小时结算合约，严格按json结构）
+        all_1h_file = "cache/1h_funding_contracts_full.json"
+        contracts = {}
+        if os.path.exists(all_1h_file):
+            with open(all_1h_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                contracts = data.get("contracts", {})
+        else:
+            print("⚠️ 未找到1小时合约池缓存，候选池为空")
             return
-        
-        # 更新合约池并执行交易
+
+        # 2. 批量获取资金费率和24h成交量
+        all_funding_rates = get_all_funding_rates()  # symbol -> info
+        all_24h_volumes = get_all_24h_volumes()      # symbol -> quoteVolume
+        threshold = self.parameters['funding_rate_threshold']
+        min_volume = self.parameters['min_volume']
+        funding_rates = {}
+        for symbol, info in contracts.items():
+            rate_info = all_funding_rates.get(symbol)
+            volume_24h = all_24h_volumes.get(symbol, 0.0)
+            merged_info = dict(info)
+            if rate_info and rate_info.get('lastFundingRate') is not None:
+                merged_info['current_funding_rate'] = float(rate_info['lastFundingRate'])
+                merged_info['mark_price'] = float(rate_info.get('markPrice', 0))
+            merged_info['volume_24h'] = float(volume_24h)
+            funding_rates[symbol] = merged_info
+            # 新增日志打印
+            rate_str = merged_info.get('current_funding_rate', 'N/A')
+            print(f"合约: {symbol}, 资金费率: {rate_str}, 24h成交量: {merged_info['volume_24h']}")
+        # 3. 更新合约池并执行交易
         self.update_contract_pool(funding_rates)
 
     def _start_update_thread(self):
@@ -460,111 +483,45 @@ class FundingRateArbitrageStrategy(BaseStrategy):
         else:
             print("⚠️ 未找到1小时合约池缓存，候选池为空")
 
-        # 2.1 批量获取所有合约资金费率和24小时成交量
-        from utils.binance_funding import get_all_funding_rates, get_all_24h_volumes
-        all_funding_rates = get_all_funding_rates()  # symbol -> info
-        all_24h_volumes = get_all_24h_volumes()      # symbol -> quoteVolume
-
-        # 3. 获取最新资金费率，筛选可交易池（含持仓合约）
+        # 3. 初始化可交易池（只包含持仓合约）
         tradable_info = {}
-        threshold = self.parameters['funding_rate_threshold']
-        min_volume = self.parameters['min_volume']
-        for symbol, info in contracts.items():
-            try:
-                # 优先用批量资金费率和批量成交量数据
-                rate_info = all_funding_rates.get(symbol)
-                volume_24h = all_24h_volumes.get(symbol, 0.0)
-                if rate_info and rate_info.get('lastFundingRate') is not None:
-                    rate = float(rate_info['lastFundingRate'])
-                    mark_price = float(rate_info.get('markPrice', 0))
-                    log_msg = f"{symbol}: 资金费率={rate:.6f}, 24h成交量={volume_24h}, "
-                    if abs(rate) >= threshold and volume_24h >= min_volume:
-                        # 构造合约详细信息
-                        merged_info = dict(info)
-                        merged_info['current_funding_rate'] = rate
-                        merged_info['mark_price'] = mark_price
-                        merged_info['volume_24h'] = volume_24h
-                        tradable_info[symbol] = merged_info
-                        log_msg += "✅ 满足入池条件"
-                    else:
-                        log_msg += "❌ 不满足入池条件"
-                    print(log_msg)
-                else:
-                    # 批量接口没有，降级为单独查
-                    latest_info = self.funding.get_comprehensive_info(symbol, contract_type="UM")
-                    if latest_info and latest_info.get('current_funding_rate') is not None:
-                        rate = float(latest_info['current_funding_rate'])
-                        volume_24h = float(latest_info.get('volume_24h', 0))
-                        log_msg = f"{symbol}: 资金费率={rate:.6f}, 24h成交量={volume_24h}, "
-                        if abs(rate) >= threshold and volume_24h >= min_volume:
-                            tradable_info[symbol] = latest_info
-                            log_msg += "✅ 满足入池条件"
-                        else:
-                            log_msg += "❌ 不满足入池条件"
-                        print(log_msg)
-                time.sleep(0.01)
-            except Exception as e:
-                print(f"❌ {symbol}: 获取资金费率失败 - {e}")
-
-        # 4. 可交易池补充持仓合约（保证持仓合约一定在池中）
         for symbol in held_symbols:
-            if symbol not in tradable_info:
-                try:
-                    info = self.funding.get_comprehensive_info(symbol, contract_type="UM")
-                    if info:
-                        tradable_info[symbol] = info
-                        print(f"🔒 持仓合约 {symbol} 强制加入可交易池")
-                except Exception as e:
-                    print(f"❌ {symbol}: 持仓合约补充失败 - {e}")
+            try:
+                info = self.funding.get_comprehensive_info(symbol, contract_type="UM")
+                if info:
+                    tradable_info[symbol] = info
+                    print(f"🔒 持仓合约 {symbol} 加入初始可交易池")
+            except Exception as e:
+                print(f"❌ {symbol}: 持仓合约补充失败 - {e}")
 
-        # 5. 再遍历一遍候选池，补充所有新满足入池条件的合约
-        for symbol, info in contracts.items():
-            if symbol not in tradable_info:
-                try:
-                    rate_info = all_funding_rates.get(symbol)
-                    volume_24h = all_24h_volumes.get(symbol, 0.0)
-                    if rate_info and rate_info.get('lastFundingRate') is not None:
-                        rate = float(rate_info['lastFundingRate'])
-                        mark_price = float(rate_info.get('markPrice', 0))
-                        log_msg = f"{symbol}: 资金费率={rate:.6f}, 24h成交量={volume_24h}, "
-                        if abs(rate) >= threshold and volume_24h >= min_volume:
-                            merged_info = dict(info)
-                            merged_info['current_funding_rate'] = rate
-                            merged_info['mark_price'] = mark_price
-                            merged_info['volume_24h'] = volume_24h
-                            tradable_info[symbol] = merged_info
-                            log_msg += "🟢 新合约满足入池条件，已补充进可交易池"
-                        else:
-                            log_msg += "❌ 不满足入池条件"
-                        print(log_msg)
-                    else:
-                        latest_info = self.funding.get_comprehensive_info(symbol, contract_type="UM")
-                        if latest_info and latest_info.get('current_funding_rate') is not None:
-                            rate = float(latest_info['current_funding_rate'])
-                            volume_24h = float(latest_info.get('volume_24h', 0))
-                            log_msg = f"{symbol}: 资金费率={rate:.6f}, 24h成交量={volume_24h}, "
-                            if abs(rate) >= threshold and volume_24h >= min_volume:
-                                tradable_info[symbol] = latest_info
-                                log_msg += "🟢 新合约满足入池条件，已补充进可交易池"
-                            else:
-                                log_msg += "❌ 不满足入池条件"
-                            print(log_msg)
-                    time.sleep(0.01)
-                except Exception as e:
-                    print(f"❌ {symbol}: 入池检测失败 - {e}")
-
-        # 6. 保存可交易池到缓存
+        # 4. 保存初始可交易池到缓存
         self.cached_contracts = tradable_info
         self.contract_pool = set(tradable_info.keys())
         self.last_update_time = datetime.now()
         self._save_cache()
-        print(f"✅ 可交易合约池最终完成，共 {len(self.contract_pool)} 个")
+        print(f"✅ 初始可交易合约池完成，共 {len(self.contract_pool)} 个")
 
-        # 7. 检查持仓合约是否还满足可交易条件，不满足则立即平仓
-        for symbol in held_symbols:
-            if symbol not in tradable_info:
-                print(f"⚠️ 持仓合约 {symbol} 已不再满足可交易条件，立即平仓")
-                self._close_position(symbol, reason="启动时自动风控平仓")
+        # 5. 启动后立即批量获取所有候选池合约的资金费率和成交量，筛选所有满足条件的合约进新池
+        from utils.binance_funding import get_all_funding_rates, get_all_24h_volumes
+        all_funding_rates = get_all_funding_rates()  # symbol -> info
+        all_24h_volumes = get_all_24h_volumes()      # symbol -> quoteVolume
+        threshold = self.parameters['funding_rate_threshold']
+        min_volume = self.parameters['min_volume']
+        funding_rates = {}
+        for symbol, info in contracts.items():
+            rate_info = all_funding_rates.get(symbol)
+            volume_24h = all_24h_volumes.get(symbol, 0.0)
+            merged_info = dict(info)
+            if rate_info and rate_info.get('lastFundingRate') is not None:
+                merged_info['current_funding_rate'] = float(rate_info['lastFundingRate'])
+                merged_info['mark_price'] = float(rate_info.get('markPrice', 0))
+            merged_info['volume_24h'] = float(volume_24h)
+            funding_rates[symbol] = merged_info
+            # 新增日志打印
+            rate_str = merged_info.get('current_funding_rate', 'N/A')
+            print(f"合约: {symbol}, 资金费率: {rate_str}, 24h成交量: {merged_info['volume_24h']}")
+        # 只要满足条件的都能进新池
+        self.update_contract_pool(funding_rates)
 
         # 启动所有更新线程
         self._start_update_thread()
