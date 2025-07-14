@@ -926,58 +926,44 @@ class FundingRateArbitrageStrategy(BaseStrategy):
             empty_message += f"💡 当前没有合约满足条件"
             send_telegram_message(empty_message)
 
-    def generate_signals(self, data: pd.DataFrame) -> List[Signal]:
-        """生成交易信号"""
-        try:
-            # 获取资金费率数据（使用缓存）
-            funding_rates = self.get_funding_rates()
-            
-            # 更新合约池并执行交易
-            self.update_contract_pool(funding_rates)
-            
-            # 为池子中的合约生成信号（用于其他系统集成）
-            signals = []
-            for contract_id in self.contract_pool:
-                if contract_id in funding_rates:
-                    info = funding_rates[contract_id]
-                    funding_rate = info.get('current_funding_rate') or info.get('funding_rate')
-                    
-                    # 确保funding_rate是float类型
-                    try:
-                        funding_rate = float(funding_rate)
-                    except (ValueError, TypeError):
-                        print(f"⚠️ {contract_id}: 资金费率无法转换为数值，跳过信号生成")
-                        continue
-                    
-                    # 根据资金费率方向生成信号
-                    if funding_rate > 0:
-                        # 正费率：做多获得资金费
-                        signal = 'buy'
-                        strength = min(1.0, abs(funding_rate) / 0.01)
-                    else:
-                        # 负费率：做空获得资金费
-                        signal = 'sell'
-                        strength = min(1.0, abs(funding_rate) / 0.01)
-                    
-                    signals.append(Signal(
-                        timestamp=pd.Timestamp.now(),
-                        symbol=contract_id,
-                        signal=signal,
-                        strength=strength,
-                        price=0,  # 资金费率策略不依赖价格
-                        strategy_name=self.name,
-                        metadata={
-                            'funding_rate': funding_rate,
-                            'exchange': info.get('exchange', 'binance'),
-                            'next_funding_time': info.get('next_funding_time')
-                        }
-                    ))
-            
+    def generate_signals(self, data: pd.DataFrame) -> list:
+        """
+        回测时每个bar都查历史资金费率，只有资金费率满足阈值才生成信号。
+        """
+        signals = []
+        threshold = self.parameters.get('funding_rate_threshold', 0.001)
+        min_volume = self.parameters.get('min_volume', 1000000)
+        funding = BinanceFunding()
+        symbol = data['symbol'].iloc[0] if 'symbol' in data.columns else None
+        if symbol is None:
             return signals
-            
-        except Exception as e:
-            print(f"生成资金费率套利信号失败: {e}")
-            return []
+        # 获取该symbol的全部历史资金费率
+        funding_history = funding.get_funding_history(symbol, contract_type="UM", limit=1000)
+        # 转为DataFrame便于查找
+        if not funding_history:
+            return signals
+        df_funding = pd.DataFrame(funding_history)
+        df_funding['funding_time'] = pd.to_datetime(df_funding['funding_time'], unit='ms')
+        df_funding.set_index('funding_time', inplace=True)
+        # 遍历每个bar，查找最近的资金费率
+        for bar in data.itertuples():
+            # 找到bar.timestamp前最近的资金费率
+            funding_row = df_funding[df_funding.index <= bar.Index].tail(1)
+            if not funding_row.empty:
+                rate = float(funding_row['funding_rate'].values[0])
+                # 资金费率绝对值大于阈值才生成信号
+                if abs(rate) >= threshold:
+                    signal_type = 'buy' if rate > 0 else 'sell'
+                    signals.append(Signal(
+                        timestamp=bar.Index,
+                        symbol=symbol,
+                        signal=signal_type,
+                        strength=min(1.0, abs(rate) / 0.01),
+                        price=getattr(bar, 'close_price', 0),
+                        strategy_name=self.name,
+                        metadata={'funding_rate': rate}
+                    ))
+        return signals
 
     def get_pool_status(self) -> Dict:
         """获取池子状态"""

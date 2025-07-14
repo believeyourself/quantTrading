@@ -4,6 +4,7 @@ import dash_bootstrap_components as dbc
 import requests
 import json
 from utils.binance_funding import BinanceFunding
+import datetime
 
 API_BASE_URL = "http://localhost:8000"
 
@@ -42,6 +43,42 @@ app.layout = dbc.Container([
                 ], width=12)
             ])
         ], label="资金费率套利", tab_id="funding-arbitrage"),
+        # 新增回测Tab
+        dbc.Tab([
+            dbc.Row([
+                dbc.Col([
+                    html.H3("资金费率套利回测"),
+                    html.P("对资金费率套利策略进行历史回测，支持自定义参数。", className="text-muted"),
+                    html.Hr(),
+                    dbc.Row([
+                        dbc.Col([
+                            dbc.Label("开始日期"),
+                            dcc.DatePickerSingle(
+                                id="backtest-start-date",
+                                date=(datetime.date.today() - datetime.timedelta(days=30)),
+                                display_format="YYYY-MM-DD",
+                                className="mb-2"
+                            ),
+                            dbc.Label("结束日期"),
+                            dcc.DatePickerSingle(
+                                id="backtest-end-date",
+                                date=datetime.date.today(),
+                                display_format="YYYY-MM-DD",
+                                className="mb-2"
+                            ),
+                            dbc.Label("初始资金"),
+                            dcc.Input(id="backtest-initial-capital", type="number", value=10000, className="mb-2"),
+                            dbc.Button("开始回测", id="run-funding-backtest", color="primary", className="mt-2"),
+                        ], width=4),
+                        dbc.Col([
+                            html.Div(id="backtest-result-summary"),
+                            html.Div(id="backtest-equity-curve"),
+                            html.Div(id="backtest-trade-table")
+                        ], width=8)
+                    ])
+                ], width=12)
+            ])
+        ], label="资金费率套利回测", tab_id="funding-arb-backtest"),
     ]),
     dbc.Toast(id="notification", header="通知", is_open=False, dismissable=True, duration=4000)
 ], fluid=True)
@@ -134,6 +171,107 @@ def update_funding_status(n):
         return status_html, positions_html, stats_html
     except Exception as e:
         return f"获取状态失败: {str(e)}", "暂无持仓", "暂无统计信息"
+
+# 回测回调
+@app.callback(
+    Output("backtest-result-summary", "children"),
+    Output("backtest-equity-curve", "children"),
+    Output("backtest-trade-table", "children"),
+    Input("run-funding-backtest", "n_clicks"),
+    State("backtest-start-date", "date"),
+    State("backtest-end-date", "date"),
+    State("backtest-initial-capital", "value"),
+    prevent_initial_call=True
+)
+def run_funding_backtest(n_clicks, start_date, end_date, initial_capital):
+    if not (start_date and end_date and initial_capital):
+        return "请填写完整参数", "", ""
+    try:
+        payload = {
+            "start_date": start_date,
+            "end_date": end_date,
+            "initial_capital": float(initial_capital)
+        }
+        resp = requests.post(f"{API_BASE_URL}/funding-arbitrage/backtest", json=payload)
+        if resp.status_code != 200:
+            return f"回测失败: {resp.text}", "", ""
+        data = resp.json()
+        results = data.get("results", {})
+        equity_curve = data.get("equity_curve", {})
+        trades = data.get("trades", {})
+        # 合并展示：每个合约一个卡片，内含摘要、资金曲线、明细
+        cards = []
+        import plotly.graph_objs as go
+        for symbol in results.keys():
+            res = results[symbol]
+            eq = equity_curve.get(symbol, [])
+            tr = trades.get(symbol, [])
+            # 只展示有交易的合约
+            if not tr:
+                continue
+            # 摘要
+            if 'error' in res:
+                summary = [html.H5(f"{symbol} 回测异常"), html.P(res['error'])]
+            else:
+                summary = [
+                    html.H5(f"{symbol} 回测结果摘要"),
+                    html.P(f"总收益率: {res.get('total_return', 0.0):.2%}"),
+                    html.P(f"最大回撤: {res.get('max_drawdown', 0.0):.2%}"),
+                    html.P(f"夏普比率: {res.get('sharpe_ratio', 0.0):.2f}"),
+                    html.P(f"胜率: {res.get('win_rate', 0.0):.2%}"),
+                    html.P(f"总交易次数: {res.get('total_trades', 0)}"),
+                    html.P(f"初始资金: {res.get('initial_capital', 0.0):.2f}"),
+                    html.P(f"期末资金: {res.get('final_capital', 0.0):.2f}")
+                ]
+            # 资金曲线
+            if eq:
+                df = [dict(timestamp=ec['timestamp'], equity=ec['equity']) for ec in eq]
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=[d['timestamp'] for d in df], y=[d['equity'] for d in df], mode='lines', name='资金曲线'))
+                fig.update_layout(title=f"{symbol} 资金曲线", xaxis_title="时间", yaxis_title="资金")
+                equity_graph = dcc.Graph(figure=fig)
+            else:
+                equity_graph = html.P(f"{symbol} 暂无资金曲线数据")
+            # 交易明细表
+            table_header = [html.Thead(html.Tr([
+                html.Th("时间"),
+                html.Th("合约"),
+                html.Th("方向"),
+                html.Th("数量"),
+                html.Th("价格"),
+                html.Th("手续费"),
+                html.Th("盈亏"),
+                html.Th("资金费率")
+            ]))]
+            table_body = [
+                html.Tr([
+                    html.Td(str(t.get('timestamp', ''))[:13] + ':00' if t.get('timestamp', '') else ''),
+                    html.Td(str(t.get('symbol', ''))),
+                    html.Td(str(t.get('side', ''))),
+                    html.Td(f"{float(t.get('quantity', 0) or 0):.4f}"),
+                    html.Td(f"{float(t.get('price', 0) or 0):.4f}"),
+                    html.Td(f"{float(t.get('commission', 0) or 0):.4f}"),
+                    html.Td(f"{float(t.get('pnl', 0) or 0):.2f}"),
+                    html.Td(f"{float(t.get('funding_rate', 0) or 0):.6f}")
+                ]) for t in tr
+            ]
+            trade_table = html.Div([
+                html.H6(f"{symbol} 交易明细"),
+                dbc.Table(table_header + [html.Tbody(table_body)], bordered=True, striped=True, hover=True, size="sm")
+            ])
+            # 合并卡片
+            cards.append(
+                dbc.Card(dbc.CardBody([
+                    *summary,
+                    html.Hr(),
+                    equity_graph,
+                    html.Hr(),
+                    trade_table
+                ]), className="mb-4")
+            )
+        return cards, "", ""
+    except Exception as e:
+        return f"回测异常: {str(e)}", "", ""
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8050) 

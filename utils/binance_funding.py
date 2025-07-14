@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Any
 import os
 import json
 import requests
+import pandas as pd
 
 class BinanceFunding:
     def __init__(self):
@@ -321,6 +322,75 @@ def get_all_24h_volumes():
     resp.raise_for_status()
     data = resp.json()
     return {item['symbol']: float(item['quoteVolume']) for item in data}
+
+def get_funding_history(symbol, contract_type="UM", limit=1000):
+    cache_dir = "data/funding"
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_file = f"{cache_dir}/{symbol}_funding.csv"
+    # 优先查本地缓存
+    if os.path.exists(cache_file):
+        df = pd.read_csv(cache_file, parse_dates=['funding_time'])
+        return df.to_dict('records')
+    # 否则请求API
+    try:
+        from binance_interface.api import UM, CM
+        um = UM()
+        cm = CM()
+        if contract_type == "UM":
+            res = um.market.get_fundingRate(symbol=symbol, limit=limit)
+        else:
+            res = cm.market.get_fundingRate(symbol=symbol, limit=limit)
+        if res and res.get('code') == 200:
+            data = res['data']
+            result = [
+                {
+                    'symbol': d.get('symbol', symbol),
+                    'funding_time': d.get('fundingTime'),
+                    'funding_rate': d.get('fundingRate'),
+                    'mark_price': d.get('markPrice'),
+                    'raw': d
+                } for d in data
+            ]
+            # 保存到本地
+            df = pd.DataFrame(result)
+            df['funding_time'] = pd.to_datetime(df['funding_time'], unit='ms')
+            df.to_csv(cache_file, index=False)
+            return result
+        return []
+    except Exception as e:
+        print(f"❌ 获取历史资金费率失败: {e}")
+        return []
+
+def get_klines(symbol, interval, start_time, end_time):
+    cache_dir = "data/history"
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_file = f"{cache_dir}/{symbol}_{interval}.csv"
+    # 优先查本地缓存
+    if os.path.exists(cache_file):
+        df = pd.read_csv(cache_file, parse_dates=['timestamp'], index_col='timestamp')
+        # 过滤时间区间
+        df = df[(df.index >= pd.to_datetime(start_time, unit='ms')) & (df.index <= pd.to_datetime(end_time, unit='ms'))]
+        if not df.empty:
+            return df
+    # 否则请求API
+    try:
+        from binance_interface.api import UM
+        um = UM()
+        res = um.market.get_klines(symbol=symbol, interval=interval, startTime=start_time, endTime=end_time)
+        if res and res.get('code') == 200:
+            data = res['data']
+            df = pd.DataFrame(data, columns=['timestamp','open','high','low','close','volume','close_time','quote_asset_volume','number_of_trades','taker_buy_base','taker_buy_quote','ignore'])
+            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+            df = df.rename(columns={'open':'open_price','high':'high_price','low':'low_price','close':'close_price'})
+            df = df[['timestamp','open_price','high_price','low_price','close_price','volume']]
+            df.set_index('timestamp', inplace=True)
+            # 保存到本地
+            df.to_csv(cache_file)
+            return df
+        return pd.DataFrame()
+    except Exception as e:
+        print(f'get_klines异常: {e}')
+        return pd.DataFrame()
 
 # 测试
 if __name__ == "__main__":

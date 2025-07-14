@@ -9,6 +9,7 @@ from config.settings import settings
 from utils.models import MarketData, SessionLocal
 import asyncio
 import aiohttp
+from utils.binance_funding import get_klines
 
 class DataManager:
     """数据管理器"""
@@ -29,14 +30,23 @@ class DataManager:
                           start_date: Optional[str] = None, 
                           end_date: Optional[str] = None,
                           limit: int = 1000) -> pd.DataFrame:
-        """获取历史数据"""
+        """只用binance_interface获取历史数据，不再尝试yfinance/ccxt。"""
         try:
-            if self.source == "yfinance":
-                return self._get_yfinance_data(symbol, timeframe, start_date, end_date)
-            elif self.source == "ccxt":
-                return self._get_ccxt_data(symbol, timeframe, start_date, end_date, limit)
-            else:
-                raise ValueError(f"不支持的数据源: {self.source}")
+            import pandas as pd
+            interval_map = {
+                "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m",
+                "1h": "1h", "4h": "4h", "1d": "1d", "1w": "1w"
+            }
+            interval = interval_map.get(timeframe, "1h")
+            start_ts = int(pd.to_datetime(start_date).timestamp() * 1000) if start_date else None
+            end_ts = int(pd.to_datetime(end_date).timestamp() * 1000) if end_date else None
+            if start_ts and end_ts:
+                df = get_klines(symbol, interval, start_ts, end_ts)
+                if not df.empty:
+                    df['timeframe'] = timeframe
+                    df['source'] = 'binance_interface'
+                    return df
+            return pd.DataFrame()
         except Exception as e:
             logger.error(f"获取历史数据失败: {e}")
             return pd.DataFrame()

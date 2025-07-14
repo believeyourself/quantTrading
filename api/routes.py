@@ -7,6 +7,7 @@ import json
 import threading
 import time
 import traceback
+import os
 
 from utils.models import Strategy, Backtest, Trade, SessionLocal, get_db
 from strategies.factory import StrategyFactory
@@ -984,6 +985,62 @@ def funding_health_check():
         "strategy_initialized": funding_strategy_instance is not None,
         "timestamp": datetime.now().isoformat()
     }
+
+class FundingArbBacktestRequest(BaseModel):
+    start_date: str
+    end_date: str
+    initial_capital: float = 10000.0
+
+@app.post("/funding-arbitrage/backtest", response_model=Dict[str, Any])
+def run_funding_arbitrage_backtest(request: FundingArbBacktestRequest):
+    """
+    资金费率套利策略回测API，遍历1h_funding_contracts_full.json所有合约，分别回测，单独展示每个合约结果。
+    """
+    try:
+        # 读取可交易池合约
+        contracts_file = os.path.join("cache", "1h_funding_contracts_full.json")
+        if not os.path.exists(contracts_file):
+            raise HTTPException(status_code=400, detail="未找到可交易池合约缓存文件")
+        with open(contracts_file, "r", encoding="utf-8") as f:
+            contracts_data = json.load(f)
+        contracts = contracts_data.get("contracts", {})
+        symbols = list(contracts.keys())
+        if not symbols:
+            raise HTTPException(status_code=400, detail="可交易池合约为空")
+        # 依次回测每个symbol
+        results = {}
+        trades = {}
+        equity_curve = {}
+        for symbol in symbols:
+            try:
+                strategy = FundingRateArbitrageStrategy({
+                    'paper_trading': True,
+                    'auto_trade': False,
+                })
+                timeframe = "1h"
+                engine = BacktestEngine(request.initial_capital)
+                res = engine.run_backtest(
+                    strategy,
+                    symbol,
+                    request.start_date,
+                    request.end_date,
+                    timeframe
+                )
+                results[symbol] = res.get('results', {})
+                trades[symbol] = res.get('trades', [])
+                equity_curve[symbol] = res.get('equity_curve', [])
+            except Exception as e:
+                results[symbol] = {"error": str(e)}
+                trades[symbol] = []
+                equity_curve[symbol] = []
+        return {
+            "results": results,
+            "trades": trades,
+            "equity_curve": equity_curve
+        }
+    except Exception as e:
+        print(f"资金费率套利回测异常: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"回测失败: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
