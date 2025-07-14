@@ -106,18 +106,21 @@ class BacktestEngine:
                             'funding_income': 0.0
                         }
                         capital -= quantity * price  # 扣除建仓资金
+                        commission = quantity * price * 0.0002  # 买入手续费0.02%
                         trade = {
                             'timestamp': funding_time,
                             'symbol': symbol,
                             'side': 'buy' if side == 'long' else 'sell',
                             'quantity': quantity,
                             'price': price,
-                            'commission': 0.0,
+                            'commission': commission,
                             'pnl': 0.0,
                             'strategy_signal': strategy.name,
-                            'funding_rate': funding_rate
+                            'funding_rate': funding_rate,
+                            'funding_income': 0.0
                         }
                         trades.append(trade)
+                        capital -= commission  # 扣除手续费
                 else:
                     # 持仓期间累加资金费率收益
                     direction = 1 if position['side'] == 'long' else -1
@@ -126,19 +129,22 @@ class BacktestEngine:
                     # 平仓逻辑：资金费率绝对值低于阈值时平仓
                     if abs(funding_rate) < threshold:
                         exit_price = price
+                        commission = quantity * exit_price * 0.0005  # 卖出手续费0.05%
                         pnl = (exit_price - position['entry_price']) * quantity * direction
                         total_pnl = pnl + funding_income
                         capital += quantity * exit_price + total_pnl  # 卖出返还+资金费率收益
+                        capital -= commission  # 扣除手续费
                         trade = {
                             'timestamp': funding_time,
                             'symbol': symbol,
                             'side': 'sell' if position['side'] == 'long' else 'buy',
                             'quantity': quantity,
                             'price': exit_price,
-                            'commission': 0.0,
+                            'commission': commission,
                             'pnl': total_pnl,
                             'strategy_signal': strategy.name,
-                            'funding_rate': funding_rate
+                            'funding_rate': funding_rate,
+                            'funding_income': funding_income
                         }
                         trades.append(trade)
                         position = None
@@ -155,19 +161,22 @@ class BacktestEngine:
             if position is not None:
                 exit_price = price
                 direction = 1 if position['side'] == 'long' else -1
+                commission = quantity * exit_price * 0.0005  # 卖出手续费0.05%
                 pnl = (exit_price - position['entry_price']) * quantity * direction
                 total_pnl = pnl + position['funding_income']
                 capital += quantity * exit_price + total_pnl
+                capital -= commission
                 trade = {
                     'timestamp': funding_time,
                     'symbol': symbol,
                     'side': 'sell' if position['side'] == 'long' else 'buy',
                     'quantity': quantity,
                     'price': exit_price,
-                    'commission': 0.0,
+                    'commission': commission,
                     'pnl': total_pnl,
                     'strategy_signal': strategy.name,
-                    'funding_rate': funding_rate
+                    'funding_rate': funding_rate,
+                    'funding_income': position['funding_income']
                 }
                 trades.append(trade)
                 equity_curve.append({
@@ -276,12 +285,11 @@ class BacktestEngine:
                         position = self.positions[symbol]
                         quantity = position.quantity
                         commission = quantity * current_price * self.commission_rate
-                        # 价差盈亏
-                        pnl = (current_price - position.entry_price) * quantity
-                        if position.side == 'short':
-                            pnl = -pnl
-                        # 总盈亏 = 价差 + 资金费率
-                        total_pnl = pnl + position.funding_income
+                        
+                        # 计算盈亏
+                        pnl = (current_price - position.entry_price) * quantity - commission
+                        
+                        # 记录交易
                         self.trades.append(Trade(
                             timestamp=timestamp,
                             symbol=symbol,
@@ -289,76 +297,15 @@ class BacktestEngine:
                             quantity=quantity,
                             price=current_price,
                             commission=commission,
-                            pnl=total_pnl,
+                            pnl=pnl,
                             strategy_signal=signal.strategy_name
                         ))
+                        
+                        # 更新资金
                         self.current_capital += (quantity * current_price - commission)
+                        
+                        # 清除持仓
                         del self.positions[symbol]
-            # 记录权益曲线
-            self._record_equity(timestamp, current_price)
-    
-    def _execute_signal(self, signal: Signal, current_price: float, timestamp: datetime):
-        """执行交易信号"""
-        symbol = signal.symbol
-        
-        if signal.signal == 'buy':
-            # 买入逻辑
-            if symbol not in self.positions or self.positions[symbol].quantity <= 0:
-                # 计算购买数量（使用可用资金的80%）
-                available_capital = self.current_capital * 0.8
-                quantity = available_capital / current_price
-                commission = quantity * current_price * self.commission_rate
-                
-                if quantity * current_price + commission <= available_capital:
-                    # 创建新持仓
-                    self.positions[symbol] = Position(
-                        symbol=symbol,
-                        quantity=quantity,
-                        entry_price=current_price,
-                        entry_time=timestamp
-                    )
-                    
-                    # 记录交易
-                    self.trades.append(Trade(
-                        timestamp=timestamp,
-                        symbol=symbol,
-                        side='buy',
-                        quantity=quantity,
-                        price=current_price,
-                        commission=commission,
-                        strategy_signal=signal.strategy_name
-                    ))
-                    
-                    # 更新资金
-                    self.current_capital -= (quantity * current_price + commission)
-                    
-        elif signal.signal == 'sell':
-            # 卖出逻辑
-            if symbol in self.positions and self.positions[symbol].quantity > 0:
-                position = self.positions[symbol]
-                quantity = position.quantity
-                commission = quantity * current_price * self.commission_rate
-                
-                # 计算盈亏
-                pnl = (current_price - position.entry_price) * quantity - commission
-                
-                # 记录交易
-                self.trades.append(Trade(
-                    timestamp=timestamp,
-                    symbol=symbol,
-                    side='sell',
-                    quantity=quantity,
-                    price=current_price,
-                    commission=commission,
-                    pnl=pnl,
-                    strategy_signal=signal.strategy_name
-                ))
-                
-                # 更新资金
-                self.current_capital += (quantity * current_price - commission)
-                
-                # 清除持仓
-                del self.positions[symbol]
     
     def _update_positions(self, current_price: float):
         """更新持仓信息"""

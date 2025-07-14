@@ -241,7 +241,8 @@ def run_funding_backtest(n_clicks, start_date, end_date, initial_capital):
                 html.Th("价格"),
                 html.Th("手续费"),
                 html.Th("盈亏"),
-                html.Th("资金费率")
+                html.Th("资金费率"),
+                html.Th("资金费率收益")
             ]))]
             table_body = [
                 html.Tr([
@@ -252,7 +253,8 @@ def run_funding_backtest(n_clicks, start_date, end_date, initial_capital):
                     html.Td(f"{float(t.get('price', 0) or 0):.4f}"),
                     html.Td(f"{float(t.get('commission', 0) or 0):.4f}"),
                     html.Td(f"{float(t.get('pnl', 0) or 0):.2f}"),
-                    html.Td(f"{float(t.get('funding_rate', 0) or 0):.6f}")
+                    html.Td(f"{float(t.get('funding_rate', 0) or 0):.6f}"),
+                    html.Td(f"{float(t.get('funding_income', 0) or 0):.2f}")
                 ]) for t in tr
             ]
             trade_table = html.Div([
