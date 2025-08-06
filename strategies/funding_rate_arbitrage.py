@@ -56,7 +56,7 @@ class FundingRateArbitrageStrategy(BaseStrategy):
                         'max_total_exposure': 0.8,        # 最大总敞口比例
                         'stop_loss_ratio': 0.05,          # 止损比例
                         'take_profit_ratio': 0.10,        # 止盈比例
-                        'auto_trade': True,               # 是否自动交易
+                        'auto_trade': False,              # 是否自动交易 - 默认关闭
                         'paper_trading': True,            # 是否模拟交易
                         'min_position_hold_time': 3600    # 最小持仓时间（秒）
                     }
@@ -78,7 +78,7 @@ class FundingRateArbitrageStrategy(BaseStrategy):
             'max_total_exposure': 0.8,        # 最大总敞口比例
             'stop_loss_ratio': 0.05,          # 止损比例
             'take_profit_ratio': 0.10,        # 止盈比例
-            'auto_trade': True,               # 是否自动交易
+            'auto_trade': False,              # 是否自动交易 - 默认关闭
             'paper_trading': True,            # 是否模拟交易
             'min_position_hold_time': 3600    # 最小持仓时间（秒）
         }
@@ -457,81 +457,45 @@ class FundingRateArbitrageStrategy(BaseStrategy):
         t.start()
 
     def start_strategy(self):
-        """启动策略（三池分离版）"""
+        """启动策略（监控模式）"""
         if self._update_threads_started:
             print("⚠️ 策略已经在运行中")
             return
-        print("🚀 启动资金费率套利策略（三池分离版）...")
-        print(f"📊 自动交易: {'开启' if self.parameters['auto_trade'] else '关闭'}")
-        print(f"📊 模拟交易: {'开启' if self.parameters['paper_trading'] else '关闭'}")
-
-        # 1. 加载持仓池
-        self._load_positions()
-        held_symbols = set(self.positions.keys())
-        print(f"📊 当前持仓池合约: {held_symbols}")
-
-        # 2. 加载候选池（所有1小时结算合约，严格按json结构）
-        all_1h_file = "cache/1h_funding_contracts_full.json"
-        contracts = {}
-        h1_contracts_count = None
-        if os.path.exists(all_1h_file):
-            with open(all_1h_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                contracts = data.get("contracts", {})
-                h1_contracts_count = data.get("h1_contracts_count")
-            print(f"📋 加载候选池（1小时合约）: {len(contracts)} 个，h1_contracts_count: {h1_contracts_count}")
-        else:
-            print("⚠️ 未找到1小时合约池缓存，候选池为空")
-
-        # 3. 初始化可交易池（只包含持仓合约）
-        tradable_info = {}
-        for symbol in held_symbols:
-            try:
-                info = self.funding.get_comprehensive_info(symbol, contract_type="UM")
-                if info:
-                    tradable_info[symbol] = info
-                    print(f"🔒 持仓合约 {symbol} 加入初始可交易池")
-            except Exception as e:
-                print(f"❌ {symbol}: 持仓合约补充失败 - {e}")
-
-        # 4. 保存初始可交易池到缓存
-        self.cached_contracts = tradable_info
-        self.contract_pool = set(tradable_info.keys())
-        self.last_update_time = datetime.now()
-        self._save_cache()
-        print(f"✅ 初始可交易合约池完成，共 {len(self.contract_pool)} 个")
-
-        # 5. 启动后立即批量获取所有候选池合约的资金费率和成交量，筛选所有满足条件的合约进新池
-        from utils.binance_funding import get_all_funding_rates, get_all_24h_volumes
-        all_funding_rates = get_all_funding_rates()  # symbol -> info
-        all_24h_volumes = get_all_24h_volumes()      # symbol -> quoteVolume
-        threshold = self.parameters['funding_rate_threshold']
-        min_volume = self.parameters['min_volume']
-        funding_rates = {}
-        for symbol, info in contracts.items():
-            rate_info = all_funding_rates.get(symbol)
-            volume_24h = all_24h_volumes.get(symbol, 0.0)
-            merged_info = dict(info)
-            if rate_info and rate_info.get('lastFundingRate') is not None:
-                merged_info['current_funding_rate'] = float(rate_info['lastFundingRate'])
-                merged_info['mark_price'] = float(rate_info.get('markPrice', 0))
-            merged_info['volume_24h'] = float(volume_24h)
-            funding_rates[symbol] = merged_info
-            # 新增日志打印
-            rate_str = merged_info.get('current_funding_rate', 'N/A')
-            print(f"合约: {symbol}, 资金费率: {rate_str}, 24h成交量: {merged_info['volume_24h']}")
-        # 只要满足条件的都能进新池
-        self.update_contract_pool(funding_rates)
-
-        # 启动所有更新线程
-        self._start_update_thread()
-        self._start_contract_refresh_thread()
-        self._start_cache_update_thread()
-        self._start_risk_monitor_thread()
-        self._start_scheduled_update_thread()
-        self._start_funding_rate_check_thread()
+        
+        print("🚀 启动资金费率套利策略（监控模式）...")
+        print(f"💡 模式: 监控模式（仅通知，不自动交易）")
+        
+        # 设置标志
         self._update_threads_started = True
-        print("✅ 策略启动完成，开始定时检测资金费率")
+        
+        # 启动资金费率检测线程
+        self._start_funding_rate_check_thread()
+        
+        # 启动合约池刷新线程
+        self._start_contract_refresh_thread()
+        
+        # 启动缓存更新线程
+        self._start_cache_update_thread()
+        
+        # 启动定时更新线程
+        self._start_scheduled_update_thread()
+        
+        # 立即执行一次检测
+        print("🔍 立即执行一次资金费率检测...")
+        self._check_funding_rates_and_trade()
+        
+        # 发送启动通知
+        start_message = f"🚀 资金费率套利策略已启动\n"
+        start_message += f"⏰ 启动时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        start_message += f"🎯 资金费率阈值: {self.parameters['funding_rate_threshold']:.4%}\n"
+        start_message += f"📊 最大池子大小: {self.parameters['max_positions']}个\n"
+        start_message += f"💰 最小成交量: {self.parameters['min_volume']:,}\n"
+        start_message += f"💡 模式: 监控模式（仅通知，不自动交易）\n"
+        start_message += f"🔄 检测间隔: {self.parameters['funding_rate_check_interval']}秒"
+        
+        send_telegram_message(start_message)
+        
+        print("✅ 资金费率套利策略启动完成（监控模式）")
 
     def stop_strategy(self):
         """停止策略"""
@@ -744,7 +708,7 @@ class FundingRateArbitrageStrategy(BaseStrategy):
         return self.cached_contracts.copy()
 
     def update_contract_pool(self, funding_rates: Dict[str, Dict]):
-        """更新合约池并生成交易信号 - 检测所有缓存的合约"""
+        """更新合约池并发送通知 - 只监控不交易"""
         threshold = self.parameters['funding_rate_threshold']
         min_volume = self.parameters['min_volume']
         max_positions = self.parameters['max_positions']
@@ -790,75 +754,13 @@ class FundingRateArbitrageStrategy(BaseStrategy):
         print(f"📊 当前池子: {len(self.contract_pool)}个, 新池子: {len(new_pool)}个")
         print(f"🟢 新增: {len(added_contracts)}个, 🔴 移除: {len(removed_contracts)}个")
         
-        # 处理新增合约（开仓信号）
-        if added_contracts and self.parameters['auto_trade']:
-            print(f"🟢 发现 {len(added_contracts)} 个新增合约，开始处理开仓...")
-            for contract_id in added_contracts:
-                print(f"🔍 处理新增合约: {contract_id}")
-                if contract_id in funding_rates:
-                    info = funding_rates[contract_id]
-                    funding_rate = info.get('current_funding_rate') or info.get('funding_rate')
-                    
-                    print(f"📊 {contract_id}: 资金费率={funding_rate}, 价格={info.get('mark_price', 'N/A')}")
-                    
-                    # 获取当前价格，避免除零错误
-                    current_price = info.get('mark_price', 0.0)
-                    
-                    # 确保current_price是数值类型
-                    try:
-                        current_price = float(current_price) if current_price is not None else 0.0
-                    except (ValueError, TypeError):
-                        current_price = 0.0
-                    
-                    if current_price <= 0:
-                        # 如果无法获取价格，尝试从历史数据中获取最新价格
-                        if info.get('history_rates') and len(info['history_rates']) > 0:
-                            try:
-                                current_price = float(info['history_rates'][0].get('mark_price', 0.0))
-                                print(f"📊 {contract_id}: 从历史数据获取价格={current_price}")
-                            except (ValueError, TypeError):
-                                current_price = 0.0
-                        
-                        if current_price <= 0:
-                            print(f"⚠️ {contract_id}: 无法获取有效价格，跳过开仓")
-                            continue
-                    
-                    print(f"🚀 {contract_id}: 准备开仓，价格={current_price:.4f}")
-                    
-                    # 确保funding_rate是float类型
-                    try:
-                        funding_rate = float(funding_rate)
-                    except (ValueError, TypeError):
-                        print(f"⚠️ {contract_id}: 资金费率无法转换为数值，跳过开仓")
-                        continue
-                    
-                    if funding_rate > 0:
-                        # 正费率：做多
-                        print(f"📈 {contract_id}: 正费率，准备做多")
-                        self._open_position(contract_id, 'long', funding_rate, current_price)
-                    else:
-                        # 负费率：做空
-                        print(f"📉 {contract_id}: 负费率，准备做空")
-                        self._open_position(contract_id, 'short', funding_rate, current_price)
-                else:
-                    print(f"❌ {contract_id}: 在funding_rates中未找到信息")
-        elif added_contracts:
-            print(f"⚠️ 发现 {len(added_contracts)} 个新增合约，但自动交易已关闭")
-        else:
-            print("📊 没有新增合约")
-        
-        # 处理移除合约（平仓信号）
-        if removed_contracts and self.parameters['auto_trade']:
-            for contract_id in removed_contracts:
-                if contract_id in self.positions:
-                    self._close_position(contract_id, "合约出池")
-        
         # 检查池子变化并发送Telegram通知
         if added_contracts or removed_contracts:
             # 构建变化消息
             change_message = f"🔄 合约池变化通知\n"
             change_message += f"⏰ 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-            change_message += f"📊 阈值: {threshold:.4%}\n\n"
+            change_message += f"📊 阈值: {threshold:.4%}\n"
+            change_message += f"💡 模式: 监控模式（仅通知，不自动交易）\n\n"
             
             if added_contracts:
                 change_message += f"🟢 新增合约 ({len(added_contracts)}个):\n"
@@ -870,7 +772,7 @@ class FundingRateArbitrageStrategy(BaseStrategy):
                         rate = float(rate)
                     except (ValueError, TypeError):
                         rate = 0.0 # 确保是数值类型
-                    direction = "做多" if rate > 0 else "做空"
+                    direction = "建议做多" if rate > 0 else "建议做空"
                     change_message += f"  • {symbol}: {rate:.4%} ({direction})\n"
                 change_message += "\n"
             
@@ -894,8 +796,7 @@ class FundingRateArbitrageStrategy(BaseStrategy):
             status_message += f"⏰ 更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
             status_message += f"📈 合约数量: {len(self.contract_pool)}个\n"
             status_message += f"🎯 阈值: {threshold:.4%}\n"
-            status_message += f"💰 当前持仓: {len(self.positions)}个\n"
-            status_message += f"💵 总盈亏: {self.total_pnl:.2f}\n\n"
+            status_message += f"💡 模式: 监控模式（仅通知，不自动交易）\n\n"
             
             # 按资金费率排序显示
             pool_contracts = []
@@ -914,7 +815,7 @@ class FundingRateArbitrageStrategy(BaseStrategy):
             pool_contracts.sort(key=lambda x: abs(x[1]), reverse=True)
             
             for symbol, rate in pool_contracts:
-                direction = "做多" if rate > 0 else "做空"
+                direction = "建议做多" if rate > 0 else "建议做空"
                 status_message += f"  • {symbol}: {rate:.4%} ({direction})\n"
             
             send_telegram_message(status_message)
@@ -923,6 +824,7 @@ class FundingRateArbitrageStrategy(BaseStrategy):
             empty_message += f"⏰ 更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
             empty_message += f"📈 合约数量: 0个\n"
             empty_message += f"🎯 阈值: {threshold:.4%}\n"
+            empty_message += f"💡 模式: 监控模式（仅通知，不自动交易）\n"
             empty_message += f"💡 当前没有合约满足条件"
             send_telegram_message(empty_message)
 

@@ -83,9 +83,12 @@ class BacktestEngine:
             capital = self.initial_capital
             quantity = None
             last_equity = capital
+            entry_price = None
+            entry_time = None
+            entry_funding_rate = None
             for idx, (funding_time, row) in enumerate(df_funding.iterrows()):
                 funding_rate = float(row['funding_rate'])
-                # 取该时刻最近的K线收盘价
+                # 严格用<=资金费率结算点的最近一根K线收盘价
                 kline_row = data[data.index <= funding_time].tail(1)
                 if kline_row.empty:
                     continue
@@ -93,7 +96,6 @@ class BacktestEngine:
                 # 建仓逻辑
                 if position is None:
                     if abs(funding_rate) >= threshold:
-                        # 假设每次用80%资金建仓
                         available_capital = capital * 0.8
                         quantity = available_capital / price
                         side = 'long' if funding_rate > 0 else 'short'
@@ -105,51 +107,61 @@ class BacktestEngine:
                             'quantity': quantity,
                             'funding_income': 0.0
                         }
-                        capital -= quantity * price  # 扣除建仓资金
-                        commission = quantity * price * 0.0002  # 买入手续费0.02%
+                        entry_price = price
+                        entry_time = funding_time
+                        entry_funding_rate = funding_rate
+                        commission = quantity * price * 0.0002
                         trade = {
                             'timestamp': funding_time,
                             'symbol': symbol,
                             'side': 'buy' if side == 'long' else 'sell',
                             'quantity': quantity,
-                            'price': price,
+                            'price_entry': price,
+                            'price_exit': None,
                             'commission': commission,
-                            'pnl': 0.0,
-                            'strategy_signal': strategy.name,
+                            'pnl_price': 0.0,
                             'funding_rate': funding_rate,
-                            'funding_income': 0.0
+                            'funding_income': 0.0,
+                            'pnl_total': 0.0,
+                            'strategy_signal': strategy.name
                         }
                         trades.append(trade)
-                        capital -= commission  # 扣除手续费
+                        capital -= quantity * price
+                        capital -= commission
                 else:
-                    # 持仓期间累加资金费率收益
+                    # 持仓期间每次结算累加资金费率收益
                     direction = 1 if position['side'] == 'long' else -1
                     funding_income = position['funding_income'] + quantity * price * funding_rate * direction
                     position['funding_income'] = funding_income
-                    # 平仓逻辑：资金费率绝对值低于阈值时平仓
+                    # 平仓逻辑
                     if abs(funding_rate) < threshold:
                         exit_price = price
-                        commission = quantity * exit_price * 0.0005  # 卖出手续费0.05%
-                        pnl = (exit_price - position['entry_price']) * quantity * direction
-                        total_pnl = pnl + funding_income
-                        capital += quantity * exit_price + total_pnl  # 卖出返还+资金费率收益
-                        capital -= commission  # 扣除手续费
+                        commission = quantity * exit_price * 0.0005
+                        pnl_price = (exit_price - position['entry_price']) * quantity * direction
+                        total_pnl = pnl_price + funding_income
+                        capital += quantity * exit_price
+                        capital += funding_income
+                        capital -= commission
                         trade = {
                             'timestamp': funding_time,
                             'symbol': symbol,
                             'side': 'sell' if position['side'] == 'long' else 'buy',
                             'quantity': quantity,
-                            'price': exit_price,
+                            'price_entry': position['entry_price'],
+                            'price_exit': exit_price,
                             'commission': commission,
-                            'pnl': total_pnl,
-                            'strategy_signal': strategy.name,
+                            'pnl_price': pnl_price,
                             'funding_rate': funding_rate,
-                            'funding_income': funding_income
+                            'funding_income': funding_income,
+                            'pnl_total': total_pnl,
+                            'strategy_signal': strategy.name
                         }
                         trades.append(trade)
                         position = None
                         funding_income = 0.0
-                # 记录资金曲线
+                        entry_price = None
+                        entry_time = None
+                        entry_funding_rate = None
                 equity_curve.append({
                     'timestamp': funding_time,
                     'equity': capital,
@@ -160,23 +172,26 @@ class BacktestEngine:
             # 若最后还持仓，强制平仓
             if position is not None:
                 exit_price = price
+                commission = quantity * exit_price * 0.0005
                 direction = 1 if position['side'] == 'long' else -1
-                commission = quantity * exit_price * 0.0005  # 卖出手续费0.05%
-                pnl = (exit_price - position['entry_price']) * quantity * direction
-                total_pnl = pnl + position['funding_income']
-                capital += quantity * exit_price + total_pnl
+                pnl_price = (exit_price - position['entry_price']) * quantity * direction
+                total_pnl = pnl_price + position['funding_income']
+                capital += quantity * exit_price
+                capital += position['funding_income']
                 capital -= commission
                 trade = {
                     'timestamp': funding_time,
                     'symbol': symbol,
                     'side': 'sell' if position['side'] == 'long' else 'buy',
                     'quantity': quantity,
-                    'price': exit_price,
+                    'price_entry': position['entry_price'],
+                    'price_exit': exit_price,
                     'commission': commission,
-                    'pnl': total_pnl,
-                    'strategy_signal': strategy.name,
+                    'pnl_price': pnl_price,
                     'funding_rate': funding_rate,
-                    'funding_income': position['funding_income']
+                    'funding_income': position['funding_income'],
+                    'pnl_total': total_pnl,
+                    'strategy_signal': strategy.name
                 }
                 trades.append(trade)
                 equity_curve.append({
@@ -198,10 +213,10 @@ class BacktestEngine:
                 max_drawdown = eq_df['drawdown'].min()
             daily_returns = eq_df['equity'].pct_change().dropna() if equity_curve else pd.Series([])
             sharpe_ratio = np.sqrt(252) * daily_returns.mean() / daily_returns.std() if daily_returns.std() > 0 else 0
-            win_trades = [t for t in trades if t.get('pnl', 0) > 0]
+            win_trades = [t for t in trades if t.get('pnl_total', 0) > 0]
             win_rate = len(win_trades) / len(trades) if trades else 0
             total_trades = len(trades)
-            total_pnl = sum(t.get('pnl', 0) for t in trades)
+            total_pnl = sum(t.get('pnl_total', 0) for t in trades)
             avg_trade_pnl = total_pnl / total_trades if total_trades > 0 else 0
             results = {
                 'initial_capital': initial_equity,

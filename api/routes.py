@@ -78,7 +78,7 @@ def create_funding_strategy(params: dict = None):
         'max_total_exposure': 0.8,
         'stop_loss_ratio': 0.05,
         'take_profit_ratio': 0.10,
-        'auto_trade': True,
+        'auto_trade': False,  # 默认关闭自动交易
         'paper_trading': True,
         'min_position_hold_time': 3600
     }

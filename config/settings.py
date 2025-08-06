@@ -65,7 +65,8 @@ class Settings(BaseSettings):
             "exchanges": ["binance"],
             "cache_duration": 3600,
             "update_interval": 1800,
-            "funding_interval": 3600
+            "funding_interval": 3600,
+            "auto_trade": False  # 默认关闭自动交易
         }
     }
     

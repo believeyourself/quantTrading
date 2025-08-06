@@ -4,6 +4,7 @@
   "cache_update_interval_seconds": 21600,
   "max_contracts_in_pool": 50,
   "min_volume_24h": 1000000,
+  "auto_trade": false,
   "telegram_notifications": {
     "enabled": true,
     "pool_changes": true,
