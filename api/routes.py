@@ -18,6 +18,10 @@ from data.manager import data_manager
 from config.settings import settings
 from utils.notifier import send_telegram_message
 
+# 在文件顶部导入os和BinanceFunding
+import os
+from utils.binance_funding import BinanceFunding
+
 app = FastAPI(title="量化交易系统", version="1.0.0")
 
 # 添加CORS中间件
@@ -753,7 +757,22 @@ def get_funding_pool_status():
     
     try:
         if not funding_strategy_instance:
-            raise HTTPException(status_code=400, detail="策略未初始化")
+            # 策略未初始化时，返回空的池子状态
+            return {
+                'status': 'success',
+                'data': {
+                    'pool_size': 0,
+                    'current_positions': 0,
+                    'total_pnl': 0.0,
+                    'win_rate': 0.0,
+                    'total_trades': 0,
+                    'winning_trades': 0,
+                    'total_exposure': 0.0,
+                    'available_capital': 0.0,
+                    'pool_contracts': [],
+                    'last_update': datetime.now().isoformat()
+                }
+            }
         
         pool_status = funding_strategy_instance.get_pool_status()
         
@@ -974,6 +993,24 @@ def update_funding_parameters(request: FundingArbitrageRequest):
         print(f"接口发生异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"更新参数失败: {str(e)}")
 
+@app.get("/funding-arbitrage/history-rate/{symbol}")
+def get_funding_history_rate(symbol: str):
+    """获取特定合约的历史资金费率"""
+    try:
+        binance_funding = BinanceFunding()
+        if not binance_funding.available:
+            raise HTTPException(status_code=500, detail="binance_interface 未安装或初始化失败")
+
+        # 获取历史资金费率，这里设置limit为100以获取更多数据点
+        history = binance_funding.get_funding_history(symbol, limit=100)
+        if not history:
+            return {"message": "未找到历史资金费率数据", "history": []}
+
+        return {"message": "成功获取历史资金费率数据", "history": history}
+    except Exception as e:
+        print(f"获取历史资金费率异常: {e}")
+        raise HTTPException(status_code=500, detail=f"获取历史资金费率失败: {str(e)}")
+
 @app.get("/funding-arbitrage/health")
 def funding_health_check():
     """资金费率套利健康检查"""
@@ -984,6 +1021,22 @@ def funding_health_check():
         "strategy_running": funding_strategy_running,
         "strategy_initialized": funding_strategy_instance is not None,
         "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/funding-arbitrage/candidates")
+def get_funding_candidates():
+    """获取所有1小时结算合约（备选合约）详细数据"""
+    import os, json
+    contracts_file = os.path.join("cache", "1h_funding_contracts_full.json")
+    if not os.path.exists(contracts_file):
+        return {"status": "error", "msg": "未找到合约缓存文件"}
+    with open(contracts_file, "r", encoding="utf-8") as f:
+        contracts_data = json.load(f)
+    return {
+        "status": "success",
+        "cache_time": contracts_data.get("cache_time"),
+        "total": len(contracts_data.get("contracts", {})),
+        "contracts": contracts_data.get("contracts", {})
     }
 
 class FundingArbBacktestRequest(BaseModel):
@@ -1042,6 +1095,61 @@ def run_funding_arbitrage_backtest(request: FundingArbBacktestRequest):
         print(f"资金费率套利回测异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"回测失败: {str(e)}")
 
+@app.post("/funding-arbitrage/refresh-candidates")
+def refresh_funding_candidates():
+    """刷新1小时结算合约池（备选池）"""
+    from utils.binance_funding import BinanceFunding
+    try:
+        funding = BinanceFunding()
+        result = funding.update_1h_contracts_cache()
+        return {"status": "success", "msg": "刷新完成", "result": result}
+    except Exception as e:
+        return {"status": "error", "msg": str(e)}
+
+@app.get("/funding-arbitrage/history-rate/<symbol>")
+def get_funding_history_rate(symbol):
+    """获取指定合约的历史资金费率（从缓存文件读取）"""
+    import os, json
+    contracts_file = os.path.join("cache", "1h_funding_contracts_full.json")
+    if not os.path.exists(contracts_file):
+        return {"status": "error", "msg": "未找到合约缓存文件"}
+    with open(contracts_file, "r", encoding="utf-8") as f:
+        contracts_data = json.load(f)
+    contracts = contracts_data.get("contracts", {})
+    info = contracts.get(symbol)
+    if not info:
+        return {"status": "error", "msg": f"未找到合约: {symbol}"}
+    history = info.get("history_rates", [])
+    # 只返回时间、资金费率、价格
+    history_simple = [
+        {
+            "funding_time": x.get("funding_time"),
+            "funding_rate": x.get("funding_rate"),
+            "mark_price": x.get("mark_price")
+        } for x in history
+    ]
+    return {"status": "success", "symbol": symbol, "history": history_simple}
+
+# 在FastAPI app初始化后，自动检测并生成合约池缓存
+@app.on_event("startup")
+def ensure_funding_contracts_cache():
+    contracts_file = os.path.join("cache", "1h_funding_contracts_full.json")
+    if not os.path.exists(contracts_file):
+        print("[启动检测] 未找到1h_funding_contracts_full.json，自动生成...")
+        funding = BinanceFunding()
+        funding.update_1h_contracts_cache()
+    else:
+        # 检查文件内容是否为空或contracts字段为空
+        try:
+            with open(contracts_file, "r", encoding="utf-8") as f:
+                data = f.read()
+                if not data or '"contracts": {}' in data:
+                    print("[启动检测] 合约池缓存为空，自动刷新...")
+                    funding = BinanceFunding()
+                    funding.update_1h_contracts_cache()
+        except Exception as e:
+            print(f"[启动检测] 检查合约池缓存异常: {e}")
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host=settings.API_HOST, port=settings.API_PORT) 
+    uvicorn.run(app, host=settings.API_HOST, port=settings.API_PORT)

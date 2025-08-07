@@ -22,6 +22,32 @@ app.layout = dbc.Container([
         dbc.Tab([
             dbc.Row([
                 dbc.Col([
+                    html.H3("合约监控总览"),
+                    html.P("查看所有1小时结算合约（备选池）和当前池中合约的详细数据。", className="text-muted"),
+                    html.Hr(),
+                    dbc.Button("🔄 刷新合约数据", id="refresh-candidates-btn", color="info", className="me-2 mb-2"),
+                    dbc.Button("♻️ 刷新备选池", id="refresh-candidates-pool-btn", color="primary", className="mb-2"),
+                    html.H4("当前池中合约"),
+                    html.Div(id="pool-contracts-table", className="mb-4"),
+                    html.H4("所有备选合约"),
+                    html.Div(id="candidates-table", className="mb-4"),
+                    dcc.Interval(id="candidates-interval", interval=60*1000, n_intervals=0),
+                    # 弹窗
+                    dbc.Modal([
+                        dbc.ModalHeader(dbc.ModalTitle(id="modal-title")),
+                        dbc.ModalBody([
+                            dcc.Graph(id="history-rate-graph"),
+                            html.Hr(),
+                            html.H5("历史资金费率表格数据"),
+                            html.Div(id="history-rate-table")
+                        ]),
+                    ], id="history-rate-modal", is_open=False, size="xl"),
+                ], width=12)
+            ])
+        ], label="合约监控", tab_id="candidates-overview"),
+        dbc.Tab([
+            dbc.Row([
+                dbc.Col([
                     html.H3("资金费率套利策略"),
                     html.P("自动化资金费率监控系统 - 仅提供通知，不自动交易", className="text-muted"),
                     html.Hr(),
@@ -87,9 +113,10 @@ app.layout = dbc.Container([
         Input("start-funding-strategy", "n_clicks"),
         Input("stop-funding-strategy", "n_clicks"),
         Input("update-funding-cache", "n_clicks"),
+        Input("refresh-candidates-pool-btn", "n_clicks"),
     ]
 )
-def unified_notification_callback(start_clicks, stop_clicks, update_clicks):
+def unified_notification_callback(start_clicks, stop_clicks, update_clicks, refresh_pool_clicks):
     ctx = callback_context
     if not ctx.triggered:
         return "", False
@@ -116,6 +143,12 @@ def unified_notification_callback(start_clicks, stop_clicks, update_clicks):
                 return data.get("message", "操作成功"), True
             else:
                 return f"操作失败: {resp.text}", True
+        elif btn_id == "refresh-candidates-pool-btn":
+            resp = requests.post(f"{API_BASE_URL}/funding-arbitrage/refresh-candidates")
+            if resp.status_code == 200:
+                return "备选合约池刷新成功！", True
+            else:
+                return f"刷新失败: {resp.text}", True
         else:
             return "", False
     except Exception as e:
@@ -258,5 +291,125 @@ def run_funding_backtest(n_clicks, start_date, end_date, initial_capital):
     except Exception as e:
         return f"回测异常: {str(e)}", "", ""
 
+@app.callback(
+    Output("pool-contracts-table", "children"),
+    Output("candidates-table", "children"),
+    [Input("refresh-candidates-btn", "n_clicks"), Input("candidates-interval", "n_intervals")]
+)
+def update_candidates_table(refresh_clicks, n_intervals):
+    try:
+        # 获取所有备选合约
+        resp = requests.get(f"{API_BASE_URL}/funding-arbitrage/candidates")
+        if resp.status_code != 200:
+            return "无法获取备选合约数据", ""
+        data = resp.json()
+        contracts = data.get("contracts", {})
+        # 获取池中合约
+        pool_resp = requests.get(f"{API_BASE_URL}/funding-arbitrage/pool-status")
+        pool_contracts = set()
+        if pool_resp.status_code == 200:
+            pool_data = pool_resp.json().get("data", {})
+            pool_contracts = set(pool_data.get("pool_contracts", []))
+            # 兼容老格式
+            if not pool_contracts and "contracts" in pool_data:
+                pool_contracts = set(pool_data["contracts"].keys())
+        # 构建池中合约表
+        pool_rows = []
+        for symbol in pool_contracts:
+            info = contracts.get(symbol, {})
+            pool_rows.append(html.Tr([
+                html.Td(html.A(symbol, href="#", n_clicks_timestamp=0, id={"type": "symbol-link", "index": symbol})),
+                html.Td(info.get("current_funding_rate", "-")),
+                html.Td(info.get("mark_price", "-")),
+                html.Td(info.get("last_updated", "-")),
+            ]))
+        pool_table = dbc.Table([
+            html.Thead(html.Tr([html.Th("合约"), html.Th("资金费率"), html.Th("价格"), html.Th("更新时间")]))
+        ] + [html.Tbody(pool_rows)], bordered=True, striped=True, hover=True)
+        # 构建所有备选合约表
+        candidate_rows = []
+        for symbol, info in contracts.items():
+            candidate_rows.append(html.Tr([
+                html.Td(html.A(symbol, href="#", n_clicks_timestamp=0, id={"type": "symbol-link", "index": symbol})),
+                html.Td(info.get("current_funding_rate", "-")),
+                html.Td(info.get("mark_price", "-")),
+                html.Td(info.get("last_updated", "-")),
+            ]))
+        candidates_table = dbc.Table([
+            html.Thead(html.Tr([html.Th("合约"), html.Th("资金费率"), html.Th("价格"), html.Th("更新时间")]))
+        ] + [html.Tbody(candidate_rows)], bordered=True, striped=True, hover=True)
+        return pool_table, candidates_table
+    except Exception as e:
+        return f"获取合约数据失败: {str(e)}", ""
+
+
+
+# 合约点击弹窗回调
+from dash.dependencies import ALL
+@app.callback(
+    Output("history-rate-modal", "is_open"),
+    Output("modal-title", "children"),
+    Output("history-rate-graph", "figure"),
+    Output("history-rate-table", "children"),
+    Input({"type": "symbol-link", "index": ALL}, "n_clicks"),
+    State({"type": "symbol-link", "index": ALL}, "id"),
+    State("history-rate-modal", "is_open"),
+    prevent_initial_call=True
+)
+def show_history_rate(n_clicks_list, id_list, is_open):
+    import plotly.graph_objs as go
+    ctx = callback_context
+    if not ctx.triggered:
+        return is_open, "", {}
+    # 找到被点击的symbol
+    for n, idd in zip(n_clicks_list, id_list):
+        if n and n > 0:
+            symbol = idd["index"]
+            # 请求历史资金费率
+            resp = requests.get(f"{API_BASE_URL}/funding-arbitrage/history-rate/{symbol}")
+            if resp.status_code != 200:
+                return True, f"{symbol} 历史资金费率获取失败", {}, html.P("数据获取失败")
+            data = resp.json()
+            history = data.get("history", [])
+            # 按时间倒序排列
+            history.reverse()
+            if not history:
+                return True, f"{symbol} 暂无历史资金费率数据", {}, html.P("暂无数据")
+            x = [datetime.datetime.fromtimestamp(h["funding_time"] / 1000) for h in history]
+            y = [float(h["funding_rate"]) for h in history]
+            price = [float(h["mark_price"]) for h in history]
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=x, y=y, mode="lines+markers", name="资金费率"))
+            fig.add_trace(go.Scatter(x=x, y=price, mode="lines", name="价格", yaxis="y2"))
+            fig.update_layout(
+                title=f"{symbol} 历史资金费率",
+                xaxis_title="时间",
+                yaxis=dict(title="资金费率", side="left"),
+                yaxis2=dict(title="价格", overlaying="y", side="right", showgrid=False),
+                legend=dict(x=0, y=1.1, orientation="h")
+            )
+            # 创建表格数据
+            table_header = [html.Thead(html.Tr([
+                html.Th("时间点"),
+                html.Th("资金费率"),
+                html.Th("合约价格")
+            ]))]
+            table_body = [html.Tbody([
+                html.Tr([
+                    html.Td(datetime.datetime.fromtimestamp(h["funding_time"] / 1000).strftime('%Y-%m-%d %H:%M:%S')),
+                    html.Td(f"{float(h['funding_rate'])*100:.4f}%"),
+                    html.Td(f"{float(h['mark_price']):.4f}")
+                ]) for h in history
+            ])]
+            history_table = dbc.Table(
+                table_header + table_body,
+                bordered=True,
+                striped=True,
+                hover=True,
+                size="sm"
+            )
+            return True, f"{symbol} 历史资金费率", fig, history_table
+    return is_open, "", {}
+
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=8050) 
+    app.run(debug=True, host="0.0.0.0", port=8050)
