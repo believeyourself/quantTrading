@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-量化交易系统主程序
+加密货币资金费率监控系统主程序
 """
 
 import os
 import sys
 import asyncio
+import json
 from loguru import logger
 from datetime import datetime
 
@@ -16,10 +17,118 @@ from utils.database import init_db, SessionLocal
 from config.settings import settings
 from data.manager import data_manager
 from strategies.factory import StrategyFactory
-from backtest.engine import BacktestEngine
-from trading.manager import trading_manager
 from api.routes import app
 from utils.notifier import send_telegram_message
+
+# 导入新的监控策略
+from strategies.funding_rate_arbitrage import FundingRateMonitor
+
+class MonitorSystem:
+    def __init__(self):
+        self.monitors = []
+        self.running = False
+
+    async def start(self):
+        """启动监控系统"""
+        try:
+            self.running = True
+            logger.info("监控系统启动中...")
+
+            # 从数据库加载监控配置
+            self.load_monitors_from_db()
+
+            # 如果没有监控配置，创建默认配置
+            if not self.monitors:
+                self.create_default_monitor()
+
+            # 启动所有监控
+            tasks = []
+            for monitor in self.monitors:
+                task = asyncio.create_task(monitor.start_monitoring())
+                tasks.append(task)
+
+            # 等待所有监控任务完成
+            await asyncio.gather(*tasks)
+
+        except Exception as e:
+            logger.error(f"监控系统启动失败: {e}")
+            self.running = False
+
+    def stop(self):
+        """停止监控系统"""
+        self.running = False
+        for monitor in self.monitors:
+            monitor.stop_monitoring()
+        logger.info("监控系统已停止")
+
+    def load_monitors_from_db(self):
+        """从数据库加载监控配置"""
+        try:
+            logger.info("从数据库加载监控配置...")
+            db = SessionLocal()
+
+            from utils.models import Strategy
+            monitor_strategies = db.query(Strategy).filter(
+                Strategy.strategy_type == "funding_rate_arbitrage"
+            ).all()
+
+            for strategy in monitor_strategies:
+                params = json.loads(strategy.parameters)
+                monitor = StrategyFactory.create_strategy("funding_rate_arbitrage", params)
+                self.monitors.append(monitor)
+                logger.info(f"加载监控配置: {strategy.name}")
+
+            logger.info(f"成功加载 {len(self.monitors)} 个监控配置")
+
+        except Exception as e:
+            logger.error(f"从数据库加载监控配置失败: {e}")
+        finally:
+            db.close()
+
+    def create_default_monitor(self):
+        """创建默认监控配置"""
+        try:
+            logger.info("创建默认监控配置...")
+            db = SessionLocal()
+
+            from utils.models import Strategy
+            # 检查是否已有资金费率监控策略
+            existing = db.query(Strategy).filter(
+                Strategy.strategy_type == "funding_rate_arbitrage"
+            ).first()
+
+            if not existing:
+                # 默认监控配置
+                default_params = {
+                    "funding_rate_threshold": 0.005,
+                    "contract_refresh_interval": 60,
+                    "funding_rate_check_interval": 60,
+                    "max_pool_size": 20,
+                    "min_volume": 1000000,
+                    "exchanges": ["binance", "okx", "bybit"]
+                }
+
+                strategy = Strategy(
+                    name="资金费率监控策略-默认",
+                    description="资金费率监控策略的默认配置",
+                    strategy_type="funding_rate_arbitrage",
+                    parameters=json.dumps(default_params)
+                )
+                db.add(strategy)
+                db.commit()
+                logger.info("成功创建默认监控配置")
+
+                # 创建监控实例
+                monitor = StrategyFactory.create_strategy("funding_rate_arbitrage", default_params)
+                self.monitors.append(monitor)
+            else:
+                logger.info("数据库中已有监控配置，跳过默认创建")
+
+        except Exception as e:
+            logger.error(f"创建默认监控配置失败: {e}")
+            db.rollback()
+        finally:
+            db.close()
 
 def setup_logging():
     """设置日志"""
@@ -51,104 +160,9 @@ def initialize_database():
         logger.info("正在初始化数据库...")
         init_db()
         logger.info("数据库初始化完成")
-        
-        # 创建默认策略
-        create_default_strategies()
-        
     except Exception as e:
         logger.error(f"数据库初始化失败: {e}")
         raise
-
-def create_default_strategies():
-    """创建默认策略"""
-    try:
-        db = SessionLocal()
-        
-        # 检查是否已有策略
-        from utils.models import Strategy
-        existing_strategies = db.query(Strategy).count()
-        if existing_strategies > 0:
-            logger.info("数据库中已有策略，跳过默认策略创建")
-            return
-        
-        logger.info("创建默认策略...")
-        
-        # 默认策略配置
-        default_strategies = [
-            {
-                "name": "MA交叉策略-默认",
-                "description": "移动平均线交叉策略的默认配置",
-                "strategy_type": "ma_cross",
-                "parameters": {
-                    "short_window": 10,
-                    "long_window": 30,
-                    "rsi_period": 14,
-                    "rsi_overbought": 70,
-                    "rsi_oversold": 30
-                }
-            },
-            {
-                "name": "布林带策略-默认",
-                "description": "布林带策略的默认配置",
-                "strategy_type": "bollinger_bands",
-                "parameters": {
-                    "window": 20,
-                    "num_std": 2,
-                    "rsi_period": 14
-                }
-            },
-            {
-                "name": "MACD策略-默认",
-                "description": "MACD策略的默认配置",
-                "strategy_type": "macd",
-                "parameters": {
-                    "fast_period": 12,
-                    "slow_period": 26,
-                    "signal_period": 9
-                }
-            },
-            {
-                "name": "RSI策略-默认",
-                "description": "RSI策略的默认配置",
-                "strategy_type": "rsi",
-                "parameters": {
-                    "rsi_period": 14,
-                    "overbought": 70,
-                    "oversold": 30,
-                    "exit_overbought": 60,
-                    "exit_oversold": 40
-                }
-            },
-            {
-                "name": "资金费率套利策略-默认",
-                "description": "资金费率套利策略的默认配置",
-                "strategy_type": "funding_rate_arbitrage",
-                "parameters": {
-                    "funding_rate_threshold": 0.005,
-                    "max_positions": 10,
-                    "min_volume": 1000000,
-                    "exchanges": ["binance", "okx", "bybit"]
-                }
-            }
-        ]
-        
-        for strategy_config in default_strategies:
-            strategy = Strategy(
-                name=strategy_config["name"],
-                description=strategy_config["description"],
-                strategy_type=strategy_config["strategy_type"],
-                parameters=json.dumps(strategy_config["parameters"])
-            )
-            db.add(strategy)
-        
-        db.commit()
-        logger.info(f"成功创建 {len(default_strategies)} 个默认策略")
-        
-    except Exception as e:
-        logger.error(f"创建默认策略失败: {e}")
-        db.rollback()
-    finally:
-        db.close()
 
 def test_data_connection():
     """测试数据连接"""
@@ -173,96 +187,41 @@ def test_data_connection():
     except Exception as e:
         logger.error(f"数据连接测试失败: {e}")
 
-def test_strategy_factory():
-    """测试策略工厂"""
+def run_monitor():
+    """运行监控系统"""
     try:
-        logger.info("测试策略工厂...")
-        
-        # 获取可用策略
-        available_strategies = StrategyFactory.get_available_strategies()
-        logger.info(f"可用策略类型: {available_strategies}")
-        
-        # 测试创建策略实例
-        for strategy_type in available_strategies:
-            strategy = StrategyFactory.create_strategy(strategy_type)
-            logger.info(f"成功创建策略: {strategy.name}")
-        
-        logger.info("策略工厂测试完成")
-        
-    except Exception as e:
-        logger.error(f"策略工厂测试失败: {e}")
+        logger.info("启动资金费率监控系统...")
 
-def run_demo_backtest():
-    """运行演示回测"""
-    try:
-        logger.info("运行演示回测...")
-        
-        # 创建策略
-        strategy = StrategyFactory.create_strategy("ma_cross")
-        
-        # 创建回测引擎
-        engine = BacktestEngine(initial_capital=10000.0)
-        
-        # 运行回测
-        results = engine.run_backtest(
-            strategy=strategy,
-            symbol="BTC-USD",
-            start_date="2023-01-01",
-            end_date="2023-12-31",
-            timeframe="1d"
-        )
-        
-        logger.info(f"演示回测完成，总收益率: {results['results']['total_return']:.2%}")
-        send_telegram_message(f"回测完成，总收益率：{results['results']['total_return']:.2%}")
-        
+        # 创建监控系统实例
+        monitor_system = MonitorSystem()
+
+        # 启动监控
+        asyncio.run(monitor_system.start())
+
+    except KeyboardInterrupt:
+        logger.info("监控系统被用户中断")
     except Exception as e:
-        logger.error(f"演示回测失败: {e}")
+        logger.error(f"监控系统运行出错: {e}")
 
 def main():
     """主函数"""
     try:
-        logger.info("=" * 50)
-        logger.info("量化交易系统启动")
-        logger.info("=" * 50)
-        
         # 设置日志
         setup_logging()
-        
+        logger.info("=== 加密货币资金费率监控系统 启动 ===")
+
         # 初始化数据库
         initialize_database()
-        
+
         # 测试数据连接
         test_data_connection()
-        
-        # 测试策略工厂
-        test_strategy_factory()
-        
-        # 运行演示回测
-        run_demo_backtest()
-        
-        logger.info("系统初始化完成")
-        logger.info(f"API服务地址: http://{settings.API_HOST}:{settings.API_PORT}")
-        logger.info(f"Web界面地址: http://localhost:8050")
-        logger.info("=" * 50)
-        send_telegram_message("量化交易系统启动成功，欢迎使用！")
-        
-        # 启动API服务
-        import uvicorn
-        uvicorn.run(
-            app,
-            host=settings.API_HOST,
-            port=settings.API_PORT,
-            reload=settings.DEBUG
-        )
-        
-    except KeyboardInterrupt:
-        logger.info("系统被用户中断")
+
+        # 运行监控系统
+        run_monitor()
+
     except Exception as e:
         logger.error(f"系统启动失败: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
-    # 导入必要的模块
-    import json
-    
-    main() 
+    main()
