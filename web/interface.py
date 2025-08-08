@@ -91,8 +91,8 @@ def update_candidates(n, refresh_clicks):
         pool_data = pool_resp.json() if pool_resp.status_code == 200 else {}
         pool_contracts = pool_data.get("contracts", [])
 
-        # 获取所有备选合约
-        candidates_resp = requests.get(f"{API_BASE_URL}/funding_monitor/candidates")
+        # 获取所有1小时结算合约
+        candidates_resp = requests.get(f"{API_BASE_URL}/funding_monitor/all-contracts")
         candidates_data = candidates_resp.json() if candidates_resp.status_code == 200 else {}
         candidates = candidates_data.get("contracts", {})
 

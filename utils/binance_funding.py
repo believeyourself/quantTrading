@@ -8,7 +8,11 @@ from typing import Dict, List, Optional, Any
 import os
 import json
 import requests
-import pandas as pd
+"""
+注意: 为了提升在不同 Python 版本/环境下的可用性，本模块避免在导入阶段强依赖 pandas。
+涉及 CSV 缓存的读写仅在运行到相应函数时尝试按需导入 pandas；
+当环境缺失 pandas 时，将跳过缓存读写或返回空数据，以保证核心扫描与监控功能可用。
+"""
 
 class BinanceFunding:
     def __init__(self):
@@ -327,10 +331,15 @@ def get_funding_history(symbol, contract_type="UM", limit=1000):
     cache_dir = "data/funding"
     os.makedirs(cache_dir, exist_ok=True)
     cache_file = f"{cache_dir}/{symbol}_funding.csv"
-    # 优先查本地缓存
-    if os.path.exists(cache_file):
-        df = pd.read_csv(cache_file, parse_dates=['funding_time'])
-        return df.to_dict('records')
+    # 优先查本地缓存（按需导入 pandas）
+    try:
+        import pandas as pd  # 按需导入
+        if os.path.exists(cache_file):
+            df = pd.read_csv(cache_file, parse_dates=['funding_time'])
+            return df.to_dict('records')
+    except Exception:
+        # 缺少 pandas 或读取失败则跳过缓存
+        pass
     # 否则请求API
     try:
         from binance_interface.api import UM, CM
@@ -351,10 +360,15 @@ def get_funding_history(symbol, contract_type="UM", limit=1000):
                     'raw': d
                 } for d in data
             ]
-            # 保存到本地
-            df = pd.DataFrame(result)
-            df['funding_time'] = pd.to_datetime(df['funding_time'], unit='ms')
-            df.to_csv(cache_file, index=False)
+            # 保存到本地（按需导入 pandas）
+            try:
+                import pandas as pd  # 按需导入
+                df = pd.DataFrame(result)
+                df['funding_time'] = pd.to_datetime(df['funding_time'], unit='ms')
+                df.to_csv(cache_file, index=False)
+            except Exception:
+                # 环境缺少 pandas 或写入失败，忽略缓存
+                pass
             return result
         return []
     except Exception as e:
@@ -365,32 +379,46 @@ def get_klines(symbol, interval, start_time, end_time):
     cache_dir = "data/history"
     os.makedirs(cache_dir, exist_ok=True)
     cache_file = f"{cache_dir}/{symbol}_{interval}.csv"
-    # 优先查本地缓存
-    if os.path.exists(cache_file):
-        df = pd.read_csv(cache_file, parse_dates=['timestamp'], index_col='timestamp')
-        # 过滤时间区间
-        df = df[(df.index >= pd.to_datetime(start_time, unit='ms')) & (df.index <= pd.to_datetime(end_time, unit='ms'))]
-        if not df.empty:
-            return df
+    # 优先查本地缓存（按需导入 pandas）
+    try:
+        import pandas as pd  # 按需导入
+        if os.path.exists(cache_file):
+            df = pd.read_csv(cache_file, parse_dates=['timestamp'], index_col='timestamp')
+            # 过滤时间区间
+            df = df[(df.index >= pd.to_datetime(start_time, unit='ms')) & (df.index <= pd.to_datetime(end_time, unit='ms'))]
+            if not df.empty:
+                return df
+    except Exception:
+        # 缺少 pandas 则跳过缓存读取
+        pass
     # 否则请求API
     try:
         from binance_interface.api import UM
         um = UM()
         res = um.market.get_klines(symbol=symbol, interval=interval, startTime=start_time, endTime=end_time)
         if res and res.get('code') == 200:
-            data = res['data']
-            df = pd.DataFrame(data, columns=['timestamp','open','high','low','close','volume','close_time','quote_asset_volume','number_of_trades','taker_buy_base','taker_buy_quote','ignore'])
-            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-            df = df.rename(columns={'open':'open_price','high':'high_price','low':'low_price','close':'close_price'})
-            df = df[['timestamp','open_price','high_price','low_price','close_price','volume']]
-            df.set_index('timestamp', inplace=True)
-            # 保存到本地
-            df.to_csv(cache_file)
-            return df
+            try:
+                import pandas as pd  # 按需导入
+                data = res['data']
+                df = pd.DataFrame(data, columns=['timestamp','open','high','low','close','volume','close_time','quote_asset_volume','number_of_trades','taker_buy_base','taker_buy_quote','ignore'])
+                df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+                df = df.rename(columns={'open':'open_price','high':'high_price','low':'low_price','close':'close_price'})
+                df = df[['timestamp','open_price','high_price','low_price','close_price','volume']]
+                df.set_index('timestamp', inplace=True)
+                # 保存到本地
+                df.to_csv(cache_file)
+                return df
+            except Exception:
+                # 无 pandas 时返回空结果
+                return []
         return pd.DataFrame()
     except Exception as e:
         print(f'get_klines异常: {e}')
-        return pd.DataFrame()
+        try:
+            import pandas as pd
+            return pd.DataFrame()
+        except Exception:
+            return []
 
 # 测试
 if __name__ == "__main__":

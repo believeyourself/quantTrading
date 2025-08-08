@@ -9,7 +9,6 @@ from config.proxy_settings import get_proxy_dict, get_ccxt_proxy_config, test_pr
 import threading
 import schedule
 from utils.binance_funding import BinanceFunding
-import pandas as pd
 
 class FundingRateMonitor(BaseStrategy):
     """资金费率监控系统 - 监控1小时资金费率结算的合约"""
@@ -226,3 +225,16 @@ class FundingRateMonitor(BaseStrategy):
         while True:
             schedule.run_pending()
             time.sleep(1)
+    
+    def get_current_pool(self):
+        """获取当前合约池"""
+        return list(self.contract_pool)
+    
+    def get_pool_status(self):
+        """获取池子状态"""
+        return {
+            "pool_size": len(self.contract_pool),
+            "candidate_size": len(self.candidate_contracts),
+            "last_update": self.last_update_time.isoformat() if self.last_update_time else None,
+            "cache_valid": self._is_cache_valid()
+        }

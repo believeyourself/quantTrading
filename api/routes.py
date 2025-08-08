@@ -308,27 +308,7 @@ def get_funding_monitor_status():
         print(f"获取资金费率监控状态异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取监控状态失败: {str(e)}")
 
-@app.get("/funding_monitor/pool")
-def get_funding_monitor_pool():
-    """获取当前资金费率监控池"""
-    global funding_monitor_instance
-    
-    try:
-        if not funding_monitor_instance:
-            raise HTTPException(status_code=400, detail="监控未启动")
-        
-        pool = funding_monitor_instance.get_current_pool()
-        return {
-            "pool_size": len(pool),
-            "contracts": pool,
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"获取监控池异常: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"获取监控池失败: {str(e)}")
+# 移除重复的路由定义，保留下面的 get_funding_pool 函数
 
 # 数据API
 @app.get("/symbols")
@@ -449,3 +429,34 @@ def get_funding_candidates():
     except Exception as e:
         print(f"获取备选合约异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取备选合约失败: {str(e)}")
+
+@app.get("/funding_monitor/all-contracts")
+def get_all_1h_contracts():
+    """获取所有1小时结算合约"""
+    try:
+        from utils.binance_funding import BinanceFunding
+        funding = BinanceFunding()
+        all_contracts = funding.get_1h_contracts_from_cache()
+        
+        # 转换数据格式以匹配Web界面期望的格式
+        formatted_contracts = {}
+        for symbol, info in all_contracts.items():
+            formatted_contracts[symbol] = {
+                "symbol": symbol,
+                "exchange": "binance",
+                "funding_rate": float(info.get("current_funding_rate", 0)),
+                "funding_time": info.get("next_funding_time", ""),
+                "volume_24h": info.get("volume_24h", 0),
+                "mark_price": info.get("mark_price", 0)
+            }
+        
+        return {
+            "status": "success",
+            "contracts": formatted_contracts,
+            "count": len(formatted_contracts),
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        print(f"获取所有1小时结算合约异常: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"获取所有1小时结算合约失败: {str(e)}")
