@@ -153,6 +153,11 @@ def open_history_modal(n_clicks, is_open):
         return False, "", {}, ""
 
     triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    
+    # 检查是否真的是历史按钮被点击
+    if not triggered_id.startswith('{"type":"view-history"'):
+        return False, "", {}, ""
+    
     try:
         symbol = json.loads(triggered_id)['index']
         resp = requests.get(f"{API_BASE_URL}/funding_rates?symbol={symbol}")

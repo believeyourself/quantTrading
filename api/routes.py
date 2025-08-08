@@ -329,16 +329,41 @@ def get_funding_rates(symbol: Optional[str] = None, exchange: Optional[str] = No
     """获取资金费率"""
     try:
         if symbol:
-            rates = data_manager.get_funding_rate(symbol, exchange)
+            # 使用 BinanceFunding 获取历史资金费率
+            from utils.binance_funding import BinanceFunding
+            funding = BinanceFunding()
+            history = funding.get_funding_history(symbol, "UM", limit=20)
+            
+            # 转换数据格式
+            formatted_history = []
+            for item in history:
+                formatted_history.append({
+                    "funding_time": datetime.fromtimestamp(item['funding_time']/1000).strftime('%Y-%m-%d %H:%M:%S'),
+                    "funding_rate": float(item['funding_rate']),
+                    "mark_price": float(item['mark_price']) if item.get('mark_price') else 0
+                })
+            
             return {
                 "symbol": symbol,
-                "exchange": exchange,
-                "funding_rate": rates
+                "exchange": exchange or "binance",
+                "funding_rate": formatted_history
             }
         else:
-            rates = data_manager.get_all_funding_rates(exchange)
+            # 获取所有合约的当前资金费率
+            from utils.binance_funding import BinanceFunding
+            funding = BinanceFunding()
+            all_contracts = funding.get_1h_contracts_from_cache()
+            
+            rates = []
+            for symbol, info in all_contracts.items():
+                rates.append({
+                    "symbol": symbol,
+                    "funding_rate": float(info.get("current_funding_rate", 0)),
+                    "mark_price": float(info.get("mark_price", 0))
+                })
+            
             return {
-                "exchange": exchange,
+                "exchange": exchange or "binance",
                 "funding_rates": rates,
                 "count": len(rates)
             }
