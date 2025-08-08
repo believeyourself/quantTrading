@@ -10,7 +10,7 @@ import time
 import threading
 
 def start_api_server():
-    """启动API服务（包含资金费率套利功能）"""
+    """启动API服务"""
     print("启动API服务...")
     subprocess.run([sys.executable, "start_api.py"])
 
