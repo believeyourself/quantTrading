@@ -5,11 +5,14 @@
 ## 功能特性
 
 ### 📊 资金费率监控
-- **1小时结算监控**：实时监控加密货币永续合约的1小时资金费率
+- **多结算周期监控**：支持1h、2h、4h、8h、12h、24h等不同结算周期的合约监控
+- **智能缓存系统**：为不同结算周期创建独立缓存文件，避免重复扫描
 - **多交易所支持**：支持Binance、OKX、Bybit等主流交易所
 - **费率阈值告警**：当资金费率超过设定阈值时触发通知
 
 ### 🔄 合约池管理
+- **多结算周期合约管理**：支持不同结算周期的备选合约管理
+- **智能缓存更新**：自动更新各结算周期的合约缓存，支持增量更新
 - **备选合约管理**：维护备选合约列表
 - **入池出池监控**：监控合约根据资金费率变化进出池子的状态
 - **成交量过滤**：基于24小时成交量设置过滤条件
@@ -51,6 +54,11 @@ quantTrading/
 ├── docs/                 # 文档目录
 ├── main.py               # 主程序
 ├── start_web.py          # Web界面启动脚本
+├── start_cache_updaters.py # 缓存更新进程管理器
+├── update_1h_contracts_cache.py # 1小时结算合约缓存更新
+├── update_all_contracts_cache.py # 所有结算周期合约缓存更新
+├── test_multi_interval_cache.py # 多结算周期缓存测试
+├── quick_test_multi_cache.py # 快速测试脚本
 ├── requirements.txt      # 依赖包
 ├── env_example.txt       # 环境变量示例
 └── README.md            # 项目说明
@@ -91,6 +99,25 @@ python start_web.py
 #### 方法二：直接运行主程序
 ```bash
 python main.py
+```
+
+#### 方法三：启动缓存更新进程
+```bash
+# 启动所有缓存更新进程
+python start_cache_updaters.py
+
+# 或单独启动特定进程
+python update_1h_contracts_cache.py      # 1小时结算合约缓存更新
+python update_all_contracts_cache.py     # 所有结算周期合约缓存更新
+```
+
+#### 方法四：测试多结算周期缓存功能
+```bash
+# 快速测试
+python quick_test_multi_cache.py
+
+# 完整测试
+python test_multi_interval_cache.py
 ```
 
 **访问地址**：

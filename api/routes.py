@@ -236,7 +236,7 @@ def delete_strategy(strategy_id: int, db: SessionLocal = Depends(get_db)):
 # 资金费率监控API
 @app.post("/funding_monitor/start")
 def start_funding_monitor(request: FundingMonitorRequest = None, background_tasks: BackgroundTasks = None):
-    """启动资金费率监控"""
+    """初始化资金费率监控（不自动启动）"""
     global funding_monitor_running, funding_monitor_thread
     
     try:
@@ -247,21 +247,20 @@ def start_funding_monitor(request: FundingMonitorRequest = None, background_task
         params = request.parameters if request else None
         create_funding_monitor(params)
         
-        # 启动监控线程
-        funding_monitor_running = True
-        funding_monitor_thread = threading.Thread(target=funding_monitor_loop, daemon=True)
-        funding_monitor_thread.start()
+        # 只初始化，不启动自动监控
+        funding_monitor_running = False  # 设置为False，表示不自动运行
         
-        # 启动实际监控
-        funding_monitor_instance.start_monitoring()
-        
-        send_telegram_message("资金费率监控已启动")
-        return {"status": "success", "message": "资金费率监控已成功启动"}
+        send_telegram_message("资金费率监控已初始化（手动模式）")
+        return {
+            "status": "success", 
+            "message": "资金费率监控已初始化，可通过Web界面手动触发操作",
+            "mode": "manual"
+        }
         
     except Exception as e:
-        print(f"启动资金费率监控异常: {e}\n{traceback.format_exc()}")
+        print(f"初始化资金费率监控异常: {e}\n{traceback.format_exc()}")
         funding_monitor_running = False
-        raise HTTPException(status_code=500, detail=f"启动监控失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"初始化监控失败: {str(e)}")
 
 @app.post("/funding_monitor/stop")
 def stop_funding_monitor():
@@ -398,10 +397,21 @@ def refresh_funding_candidates():
             funding_monitor_instance = FundingRateMonitor()
             print("临时创建监控实例用于刷新备选池")
 
-        funding_monitor_instance.refresh_contract_pool()
+        # 强制刷新合约池
+        funding_monitor_instance.refresh_contract_pool(force_refresh=True)
+        
+        # 同时更新所有结算周期合约缓存
+        try:
+            from utils.binance_funding import BinanceFunding
+            funding = BinanceFunding()
+            funding.update_all_contracts_cache()
+            print("✅ 所有结算周期合约缓存更新成功")
+        except Exception as e:
+            print(f"⚠️ 更新所有结算周期合约缓存失败: {e}")
+        
         return {
             "status": "success",
-            "message": "备选合约池刷新成功",
+            "message": "备选合约池刷新成功，包括最新资金费率数据和所有结算周期合约缓存",
             "timestamp": datetime.now().isoformat()
         }
 
@@ -456,32 +466,277 @@ def get_funding_candidates():
         raise HTTPException(status_code=500, detail=f"获取备选合约失败: {str(e)}")
 
 @app.get("/funding_monitor/all-contracts")
-def get_all_1h_contracts():
-    """获取所有1小时结算合约"""
+def get_all_contracts():
+    """获取所有结算周期合约"""
     try:
         from utils.binance_funding import BinanceFunding
         funding = BinanceFunding()
-        all_contracts = funding.get_1h_contracts_from_cache()
         
-        # 转换数据格式以匹配Web界面期望的格式
-        formatted_contracts = {}
-        for symbol, info in all_contracts.items():
-            formatted_contracts[symbol] = {
-                "symbol": symbol,
-                "exchange": "binance",
-                "funding_rate": float(info.get("current_funding_rate", 0)),
-                "funding_time": info.get("next_funding_time", ""),
-                "volume_24h": info.get("volume_24h", 0),
-                "mark_price": info.get("mark_price", 0)
+        # 获取所有结算周期合约基础信息
+        all_contracts_data = funding.get_all_intervals_from_cache()
+        
+        if not all_contracts_data or not all_contracts_data.get('contracts_by_interval'):
+            return {
+                "status": "error",
+                "message": "没有合约缓存数据，请先刷新合约缓存",
+                "timestamp": datetime.now().isoformat()
             }
+        
+        # 转换数据格式以匹配Web界面期望的格式，并获取最新资金费率
+        formatted_contracts = {}
+        total_contracts = 0
+        
+        for interval, contracts in all_contracts_data['contracts_by_interval'].items():
+            for symbol, info in contracts.items():
+                try:
+                    # 获取最新的资金费率信息
+                    current_info = funding.get_current_funding(symbol, "UM")
+                    if current_info:
+                        # 使用最新的资金费率数据
+                        funding_rate = float(current_info.get('funding_rate', 0))
+                        next_funding_time = current_info.get('next_funding_time')
+                        if next_funding_time:
+                            next_time = datetime.fromtimestamp(next_funding_time / 1000)
+                            funding_time_str = next_time.strftime('%Y-%m-%d %H:%M:%S')
+                        else:
+                            funding_time_str = info.get("next_funding_time", "")
+                    else:
+                        # 如果获取失败，使用缓存数据
+                        funding_rate = float(info.get("current_funding_rate", 0))
+                        funding_time_str = info.get("next_funding_time", "")
+                    
+                    formatted_contracts[symbol] = {
+                        "symbol": symbol,
+                        "exchange": "binance",
+                        "funding_rate": funding_rate,
+                        "funding_time": funding_time_str,
+                        "funding_interval": interval,
+                        "volume_24h": info.get("volume_24h", 0),
+                        "mark_price": info.get("mark_price", 0)
+                    }
+                    total_contracts += 1
+                    
+                    # 添加小延迟避免API限流
+                    time.sleep(0.05)
+                    
+                except Exception as e:
+                    print(f"处理合约 {symbol} 时出错: {e}")
+                    # 使用缓存数据作为备选
+                    formatted_contracts[symbol] = {
+                        "symbol": symbol,
+                        "exchange": "binance",
+                        "funding_rate": float(info.get("current_funding_rate", 0)),
+                        "funding_time": info.get("next_funding_time", ""),
+                        "funding_interval": interval,
+                        "volume_24h": info.get("volume_24h", 0),
+                        "mark_price": info.get("mark_price", 0)
+                    }
+                    total_contracts += 1
         
         return {
             "status": "success",
+            "contracts": formatted_contracts,
+            "count": total_contracts,
+            "intervals": list(all_contracts_data.get('contracts_by_interval', {}).keys()),
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        print(f"获取所有结算周期合约异常: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"获取所有结算周期合约失败: {str(e)}")
+
+@app.get("/funding_monitor/contracts-by-interval/{interval}")
+def get_contracts_by_interval(interval: str):
+    """获取指定结算周期的合约"""
+    try:
+        from utils.binance_funding import BinanceFunding
+        funding = BinanceFunding()
+        
+        # 获取指定结算周期的合约
+        contracts = funding.get_contracts_by_interval_from_cache(interval)
+        
+        if not contracts:
+            return {
+                "status": "error",
+                "message": f"没有找到{interval}结算周期的合约缓存数据",
+                "timestamp": datetime.now().isoformat()
+            }
+        
+        # 转换数据格式
+        formatted_contracts = {}
+        for symbol, info in contracts.items():
+            try:
+                # 获取最新的资金费率信息
+                current_info = funding.get_current_funding(symbol, "UM")
+                if current_info:
+                    funding_rate = float(current_info.get('funding_rate', 0))
+                    next_funding_time = current_info.get('next_funding_time')
+                    if next_funding_time:
+                        next_time = datetime.fromtimestamp(next_funding_time / 1000)
+                        funding_time_str = next_time.strftime('%Y-%m-%d %H:%M:%S')
+                    else:
+                        funding_time_str = info.get("next_funding_time", "")
+                else:
+                    funding_rate = float(info.get("current_funding_rate", 0))
+                    funding_time_str = info.get("next_funding_time", "")
+                
+                formatted_contracts[symbol] = {
+                    "symbol": symbol,
+                    "exchange": "binance",
+                    "funding_rate": funding_rate,
+                    "funding_time": funding_time_str,
+                    "funding_interval": interval,
+                    "volume_24h": info.get("volume_24h", 0),
+                    "mark_price": info.get("mark_price", 0)
+                }
+                
+                # 添加小延迟避免API限流
+                time.sleep(0.05)
+                
+            except Exception as e:
+                print(f"处理合约 {symbol} 时出错: {e}")
+                formatted_contracts[symbol] = {
+                    "symbol": symbol,
+                    "exchange": "binance",
+                    "funding_rate": float(info.get("current_funding_rate", 0)),
+                    "funding_time": info.get("next_funding_time", ""),
+                    "funding_interval": interval,
+                    "volume_24h": info.get("volume_24h", 0),
+                    "mark_price": info.get("mark_price", 0)
+                }
+        
+        return {
+            "status": "success",
+            "interval": interval,
             "contracts": formatted_contracts,
             "count": len(formatted_contracts),
             "timestamp": datetime.now().isoformat()
         }
 
     except Exception as e:
-        print(f"获取所有1小时结算合约异常: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"获取所有1小时结算合约失败: {str(e)}")
+        print(f"获取{interval}结算周期合约异常: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"获取{interval}结算周期合约失败: {str(e)}")
+
+@app.get("/funding_monitor/cache-status")
+def get_cache_status():
+    """获取缓存状态概览"""
+    try:
+        from utils.binance_funding import BinanceFunding
+        funding = BinanceFunding()
+        
+        cache_status = funding.get_all_intervals_from_cache()
+        
+        if not cache_status:
+            return {
+                "status": "error",
+                "message": "没有缓存数据",
+                "timestamp": datetime.now().isoformat()
+            }
+        
+        return {
+            "status": "success",
+            "cache_time": cache_status.get('cache_time'),
+            "intervals": cache_status.get('intervals', []),
+            "total_contracts": cache_status.get('total_contracts', 0),
+            "contracts_by_interval": {
+                interval: len(contracts) 
+                for interval, contracts in cache_status.get('contracts_by_interval', {}).items()
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        print(f"获取缓存状态异常: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"获取缓存状态失败: {str(e)}")
+
+@app.get("/funding_monitor/latest-rates")
+def get_latest_funding_rates():
+    """获取所有结算周期合约的最新资金费率"""
+    try:
+        from utils.binance_funding import BinanceFunding
+        funding = BinanceFunding()
+        
+        # 获取所有结算周期合约基础信息
+        all_contracts_data = funding.get_all_intervals_from_cache()
+        
+        if not all_contracts_data or not all_contracts_data.get('contracts_by_interval'):
+            return {
+                "status": "error",
+                "message": "没有合约缓存数据，请先刷新合约缓存",
+                "timestamp": datetime.now().isoformat()
+            }
+        
+        # 获取最新资金费率
+        latest_rates = {}
+        real_time_count = 0
+        cached_count = 0
+        
+        for interval, contracts in all_contracts_data['contracts_by_interval'].items():
+            for symbol in contracts.keys():
+                try:
+                    current_info = funding.get_current_funding(symbol, "UM")
+                    if current_info:
+                        latest_rates[symbol] = {
+                            "symbol": symbol,
+                            "exchange": "binance",
+                            "funding_rate": float(current_info.get('funding_rate', 0)),
+                            "next_funding_time": current_info.get('next_funding_time'),
+                            "funding_interval": interval,
+                            "mark_price": current_info.get('mark_price'),
+                            "index_price": current_info.get('index_price'),
+                            "last_updated": datetime.now().isoformat(),
+                            "data_source": "real_time"
+                        }
+                        real_time_count += 1
+                    else:
+                        # 使用缓存数据
+                        cached_info = contracts.get(symbol, {})
+                        latest_rates[symbol] = {
+                            "symbol": symbol,
+                            "exchange": "binance",
+                            "funding_rate": float(cached_info.get('current_funding_rate', 0)),
+                            "next_funding_time": cached_info.get('next_funding_time'),
+                            "funding_interval": interval,
+                            "mark_price": cached_info.get('mark_price'),
+                            "index_price": cached_info.get('index_price'),
+                            "last_updated": "cached",
+                            "data_source": "cached",
+                            "note": "使用缓存数据"
+                        }
+                        cached_count += 1
+                    
+                    # 添加延迟避免API限流
+                    time.sleep(0.1)
+                    
+                except Exception as e:
+                    print(f"获取 {symbol} 最新资金费率失败: {e}")
+                    # 使用缓存数据
+                    cached_info = contracts.get(symbol, {})
+                    latest_rates[symbol] = {
+                        "symbol": symbol,
+                        "exchange": "binance",
+                        "funding_rate": float(cached_info.get('current_funding_rate', 0)),
+                        "next_funding_time": cached_info.get('next_funding_time'),
+                        "funding_interval": interval,
+                        "mark_price": cached_info.get('mark_price'),
+                        "index_price": cached_info.get('index_price'),
+                        "last_updated": "cached",
+                        "data_source": "cached",
+                        "note": "使用缓存数据"
+                    }
+                    cached_count += 1
+        
+        return {
+            "status": "success",
+            "contracts": latest_rates,
+            "count": len(latest_rates),
+            "real_time_count": real_time_count,
+            "cached_count": cached_count,
+            "intervals": list(all_contracts_data.get('contracts_by_interval', {}).keys()),
+            "timestamp": datetime.now().isoformat(),
+            "note": "包含最新实时资金费率数据"
+        }
+
+    except Exception as e:
+        print(f"获取最新资金费率异常: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"获取最新资金费率失败: {str(e)}")

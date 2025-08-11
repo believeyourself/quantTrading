@@ -26,6 +26,7 @@ app.layout = dbc.Container([
                     html.P("查看所有1小时结算合约（备选池）和当前监控合约的详细数据。", className="text-muted"),
                     html.Hr(),
                     dbc.Button("🔄 刷新合约数据", id="refresh-candidates-btn", color="info", className="me-2 mb-2"),
+                    dbc.Button("📊 获取最新资金费率", id="get-latest-rates-btn", color="success", className="me-2 mb-2"),
                     dbc.Button("♻️ 刷新备选池", id="refresh-candidates-pool-btn", color="primary", className="mb-2"),
                     html.H4("当前监控合约"),
                     html.Div(id="pool-contracts-table", className="mb-4"),
@@ -86,6 +87,17 @@ def unified_notification_callback(refresh_pool_clicks):
 
 def update_candidates(n, refresh_clicks):
     try:
+        # 如果点击了刷新按钮，先调用刷新API
+        if refresh_clicks and refresh_clicks > 0:
+            try:
+                refresh_resp = requests.post(f"{API_BASE_URL}/funding_monitor/refresh-candidates")
+                if refresh_resp.status_code == 200:
+                    print("✅ 备选合约池刷新成功")
+                else:
+                    print(f"⚠️ 刷新失败: {refresh_resp.text}")
+            except Exception as e:
+                print(f"⚠️ 刷新请求异常: {e}")
+        
         # 获取当前监控合约
         pool_resp = requests.get(f"{API_BASE_URL}/funding_monitor/pool")
         pool_data = pool_resp.json() if pool_resp.status_code == 200 else {}
@@ -204,6 +216,89 @@ def open_history_modal(n_clicks, is_open):
         return not is_open, f"{symbol} 历史资金费率", figure, table
     except Exception as e:
         return not is_open, "错误", {}, f"获取数据异常: {str(e)}"
+
+# 获取最新资金费率回调
+@app.callback(
+    Output("candidates-table", "children", allow_duplicate=True),
+    Output("notification", "children", allow_duplicate=True),
+    Output("notification", "is_open", allow_duplicate=True),
+    Input("get-latest-rates-btn", "n_clicks"),
+    prevent_initial_call=True
+)
+def get_latest_funding_rates(latest_rates_clicks):
+    if not latest_rates_clicks or latest_rates_clicks <= 0:
+        return dash.no_update, "", False
+    
+    try:
+        # 调用获取最新资金费率的API
+        latest_resp = requests.get(f"{API_BASE_URL}/funding_monitor/latest-rates")
+        if latest_resp.status_code != 200:
+            return dash.no_update, f"获取最新资金费率失败: {latest_resp.text}", True
+        
+        latest_data = latest_resp.json()
+        latest_contracts = latest_data.get("contracts", {})
+        
+        if latest_contracts:
+            # 构建最新资金费率表格
+            candidates_table_header = [html.Thead(html.Tr([
+                html.Th("合约名称"), 
+                html.Th("交易所"), 
+                html.Th("最新资金费率"), 
+                html.Th("下次结算时间"), 
+                html.Th("标记价格"),
+                html.Th("数据状态")
+            ]))]
+            
+            candidates_table_rows = []
+            for symbol, info in latest_contracts.items():
+                funding_rate = info.get("funding_rate", 0)
+                next_time = info.get("next_funding_time")
+                if next_time:
+                    try:
+                        next_time_dt = datetime.fromtimestamp(int(next_time) / 1000)
+                        next_time_str = next_time_dt.strftime('%Y-%m-%d %H:%M:%S')
+                    except:
+                        next_time_str = str(next_time)
+                else:
+                    next_time_str = "未知"
+                
+                # 根据资金费率设置颜色
+                rate_color = "success" if abs(funding_rate) >= 0.005 else "secondary"
+                rate_text = f"{funding_rate*100:.4f}%"
+                
+                # 数据状态指示
+                data_status = info.get("last_updated", "")
+                if data_status == "cached":
+                    status_badge = dbc.Badge("缓存", color="warning", className="ms-1")
+                else:
+                    status_badge = dbc.Badge("实时", color="success", className="ms-1")
+                
+                candidates_table_rows.append(
+                    html.Tr([
+                        html.Td(symbol),
+                        html.Td(info.get("exchange", "")),
+                        html.Td(dbc.Badge(rate_text, color=rate_color)),
+                        html.Td(next_time_str),
+                        html.Td(f"${info.get('mark_price', 0):.4f}"),
+                        html.Td(status_badge)
+                    ])
+                )
+            
+            candidates_table = dbc.Table(candidates_table_header + [html.Tbody(candidates_table_rows)], bordered=True, hover=True)
+            
+            # 统计信息
+            real_time_count = sum(1 for info in latest_contracts.values() if info.get("last_updated") != "cached")
+            cached_count = len(latest_contracts) - real_time_count
+            
+            notification_msg = f"✅ 成功获取 {len(latest_contracts)} 个合约的最新资金费率数据 (实时: {real_time_count}, 缓存: {cached_count})"
+            
+            return candidates_table, notification_msg, True
+        else:
+            return html.P("暂无最新资金费率数据"), "⚠️ 未获取到最新资金费率数据", True
+            
+    except Exception as e:
+        error_msg = f"❌ 获取最新资金费率异常: {str(e)}"
+        return dash.no_update, error_msg, True
 
 if __name__ == '__main__':
     app.run_server(debug=True, host='0.0.0.0', port=8050)

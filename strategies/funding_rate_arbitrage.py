@@ -115,12 +115,12 @@ class FundingRateMonitor(BaseStrategy):
             with self._update_lock:
                 self._updating = False
 
-    def refresh_contract_pool(self):
+    def refresh_contract_pool(self, force_refresh=False):
         """刷新合约池 - 入池出池逻辑"""
         try:
             print("🔄 开始刷新合约池...")
             # 获取所有合约 (使用scan_1h_funding_contracts替代get_all_funding_contracts)
-            all_contracts = self.funding.scan_1h_funding_contracts()
+            all_contracts = self.funding.scan_1h_funding_contracts(force_refresh=force_refresh)
             if not all_contracts:
                 print("❌ 未能获取合约列表，尝试从缓存加载...")
                 all_contracts = self.funding.get_1h_contracts_from_cache()
@@ -202,23 +202,29 @@ class FundingRateMonitor(BaseStrategy):
             print(f"❌ 检查资金费率失败: {e}")
 
     def start_monitoring(self):
-        """启动监控"""
-        print("🚀 启动资金费率监控系统...")
+        """初始化监控（不自动启动）"""
+        print("🚀 初始化资金费率监控系统...")
         
         # 初始刷新合约池
         self.refresh_contract_pool()
         
-        # 设置定时任务
-        schedule.every(self.parameters['contract_refresh_interval']).minutes.do(self.refresh_contract_pool)
-        schedule.every(self.parameters['funding_rate_check_interval']).minutes.do(self.check_funding_rates)
+        print("✅ 监控系统已初始化（手动模式）")
+        print("💡 可通过Web界面或API手动触发操作")
+        print("   - 刷新合约池")
+        print("   - 检查资金费率")
+        print("   - 更新缓存")
         
-        # 启动更新线程
-        if not self._update_threads_started:
-            self._update_threads_started = True
-            update_thread = threading.Thread(target=self._run_scheduler)
-            update_thread.daemon = True
-            update_thread.start()
-            print("✅ 监控线程已启动")
+        # 不启动定时任务，等待手动触发
+        # schedule.every(self.parameters['contract_refresh_interval']).minutes.do(self.refresh_contract_pool)
+        # schedule.every(self.parameters['funding_rate_check_interval']).minutes.do(self.check_funding_rates)
+        
+        # 不启动更新线程
+        # if not self._update_threads_started:
+        #     self._update_threads_started = True
+        #     update_thread = threading.Thread(target=self._run_scheduler)
+        #     update_thread.daemon = True
+        #     update_thread.start()
+        #     print("✅ 监控线程已启动")
 
     def _run_scheduler(self):
         """运行调度器"""

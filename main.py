@@ -188,20 +188,28 @@ def test_data_connection():
         logger.error(f"数据连接测试失败: {e}")
 
 def run_monitor():
-    """运行监控系统"""
+    """初始化监控系统（不自动启动）"""
     try:
-        logger.info("启动资金费率监控系统...")
+        logger.info("初始化资金费率监控系统...")
 
         # 创建监控系统实例
         monitor_system = MonitorSystem()
 
-        # 启动监控
-        asyncio.run(monitor_system.start())
+        # 只初始化，不启动监控
+        logger.info("✅ 监控系统初始化完成")
+        logger.info("💡 系统已就绪，可通过Web界面或API手动触发监控操作")
+        logger.info("🌐 启动Web界面: python start_web.py")
+        logger.info("🚀 启动API服务: python start_api.py")
+        
+        # 保持程序运行，等待用户操作
+        try:
+            while True:
+                await asyncio.sleep(1)
+        except KeyboardInterrupt:
+            logger.info("系统被用户中断")
 
-    except KeyboardInterrupt:
-        logger.info("监控系统被用户中断")
     except Exception as e:
-        logger.error(f"监控系统运行出错: {e}")
+        logger.error(f"监控系统初始化失败: {e}")
 
 def main():
     """主函数"""
@@ -216,8 +224,8 @@ def main():
         # 测试数据连接
         test_data_connection()
 
-        # 运行监控系统
-        run_monitor()
+        # 初始化监控系统（不自动启动）
+        asyncio.run(run_monitor())
 
     except Exception as e:
         logger.error(f"系统启动失败: {e}")
