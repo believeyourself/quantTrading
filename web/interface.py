@@ -5,6 +5,7 @@ import requests
 import json
 import traceback
 import datetime
+import os # Added for file operations
 
 API_BASE_URL = "http://localhost:8000"
 
@@ -12,36 +13,65 @@ app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 app.title = "加密货币资金费率监控系统"
 
 def load_cached_data(interval="1h"):
-    """加载缓存数据"""
+    """直接加载本地缓存数据，不调用API"""
     try:
-        print(f"📋 开始加载缓存数据，结算周期: {interval}")
+        print(f"📋 开始加载本地缓存数据，结算周期: {interval}")
         
-        # 获取当前监控合约（从缓存）
-        print("📡 正在获取监控合约数据...")
-        pool_resp = requests.get(f"{API_BASE_URL}/funding_monitor/pool")
-        print(f"📡 监控合约API响应状态: {pool_resp.status_code}")
-        pool_data = pool_resp.json() if pool_resp.status_code == 200 else {}
-        pool_contracts = pool_data.get("contracts", [])
-        print(f"📋 从缓存加载了 {len(pool_contracts)} 个监控合约")
+        # 直接读取监控合约缓存文件
+        pool_contracts = []
+        try:
+            with open("cache/funding_rate_contracts.json", 'r', encoding='utf-8') as f:
+                pool_data = json.load(f)
+                if 'contracts' in pool_data:
+                    contracts = pool_data.get('contracts', {})
+                else:
+                    contracts = pool_data
+                
+                # 转换为列表格式
+                for symbol, info in contracts.items():
+                    try:
+                        pool_contracts.append({
+                            "symbol": symbol,
+                            "exchange": info.get("exchange", "binance"),
+                            "funding_rate": float(info.get("current_funding_rate", 0)),
+                            "funding_time": info.get("next_funding_time", ""),
+                            "volume_24h": info.get("volume_24h", 0),
+                            "mark_price": info.get("mark_price", 0)
+                        })
+                    except (ValueError, TypeError) as e:
+                        print(f"⚠️ 处理监控合约 {symbol} 时出错: {e}")
+                        continue
+                
+                print(f"📋 从本地缓存加载了 {len(pool_contracts)} 个监控合约")
+        except FileNotFoundError:
+            print("📋 监控合约缓存文件不存在")
+        except Exception as e:
+            print(f"⚠️ 读取监控合约缓存失败: {e}")
 
-        # 根据结算周期获取对应的缓存数据
-        print(f"📡 正在获取{interval}结算周期合约数据...")
-        candidates_resp = requests.get(f"{API_BASE_URL}/funding_monitor/contracts-by-interval/{interval}")
-        print(f"📡 备选合约API响应状态: {candidates_resp.status_code}")
-        candidates_data = candidates_resp.json() if candidates_resp.status_code == 200 else {}
-        candidates = candidates_data.get("contracts", {})
-        print(f"📋 从缓存加载了 {len(candidates)} 个{interval}结算周期合约")
+        # 直接读取指定结算周期的缓存文件
+        candidates = {}
+        try:
+            cache_file = f"cache/{interval}_funding_contracts_full.json"
+            if os.path.exists(cache_file):
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    cache_data = json.load(f)
+                    candidates = cache_data.get('contracts', {})
+                    print(f"📋 从本地缓存加载了 {len(candidates)} 个{interval}结算周期合约")
+            else:
+                print(f"📋 {interval}结算周期缓存文件不存在: {cache_file}")
+        except Exception as e:
+            print(f"⚠️ 读取{interval}结算周期缓存失败: {e}")
         
         print("🔧 开始构建表格...")
         result = build_tables(pool_contracts, candidates, interval)
-        print("✅ 缓存数据加载完成")
+        print("✅ 本地缓存数据加载完成")
         return result
         
     except Exception as e:
-        error_msg = f"加载缓存数据失败: {str(e)}"
-        print(f"❌ 加载缓存数据异常: {error_msg}")
+        error_msg = f"加载本地缓存数据失败: {str(e)}"
+        print(f"❌ 加载本地缓存数据异常: {error_msg}")
         print(f"❌ 异常详情: {traceback.format_exc()}")
-        return f"加载缓存数据失败: {str(e)}", f"加载缓存数据失败: {str(e)}"
+        return f"加载本地缓存数据失败: {str(e)}", f"加载本地缓存数据失败: {str(e)}"
 
 app.layout = dbc.Container([
     # 页面初始化触发器
@@ -103,6 +133,7 @@ app.layout = dbc.Container([
     dbc.Toast(id="notification", header="通知", is_open=False, dismissable=True, duration=4000)
 ], fluid=True)
 
+# 这个回调函数现在只处理其他通知，刷新备选池由专门的回调函数处理
 @app.callback(
     Output("notification", "children"),
     Output("notification", "is_open"),
@@ -112,21 +143,8 @@ app.layout = dbc.Container([
 )
 
 def unified_notification_callback(refresh_pool_clicks):
-    ctx = callback_context
-    if not ctx.triggered:
-        return "", False
-    btn_id = ctx.triggered[0]['prop_id'].split('.')[0]
-    try:
-        if btn_id == "refresh-candidates-pool-btn":
-            resp = requests.post(f"{API_BASE_URL}/funding_monitor/refresh-candidates")
-            if resp.status_code == 200:
-                return "备选合约池刷新成功！", True
-            else:
-                return f"刷新失败: {resp.text}", True
-        else:
-            return "", False
-    except Exception as e:
-        return f"请求异常: {str(e)}", True
+    # 这个回调函数现在由专门的refresh_candidates_pool函数处理
+    return "", False
 
 # 页面初始化回调 - 使用dcc.Store来触发初始化
 @app.callback(
@@ -166,43 +184,61 @@ def filter_by_interval(interval):
     prevent_initial_call=True
 )
 def update_candidates_data(refresh_clicks):
-    """只加载缓存数据，不调用API更新"""
+    """刷新时重新加载本地缓存数据"""
     try:
         # 默认使用1h结算周期，或者可以从当前选中的值获取
         interval = "1h"  # 这里可以改为从当前选中的值获取
-        print(f"📋 开始加载缓存数据，结算周期: {interval}")
+        print(f"🔄 刷新按钮点击 - 重新加载本地缓存数据，结算周期: {interval}")
         
-        # 获取当前监控合约（从缓存）
-        print("📡 正在获取监控合约数据...")
-        pool_resp = requests.get(f"{API_BASE_URL}/funding_monitor/pool")
-        print(f"📡 监控合约API响应状态: {pool_resp.status_code}")
-        pool_data = pool_resp.json() if pool_resp.status_code == 200 else {}
-        pool_contracts = pool_data.get("contracts", [])
-        print(f"📋 从缓存加载了 {len(pool_contracts)} 个监控合约")
-
-        # 根据结算周期获取对应的缓存数据
-        print(f"📡 正在获取{interval}结算周期合约数据...")
-        candidates_resp = requests.get(f"{API_BASE_URL}/funding_monitor/contracts-by-interval/{interval}")
-        print(f"📡 备选合约API响应状态: {candidates_resp.status_code}")
-        candidates_data = candidates_resp.json() if candidates_resp.status_code == 200 else {}
-        candidates = candidates_data.get("contracts", {})
-        print(f"📋 从缓存加载了 {len(candidates)} 个{interval}结算周期合约")
+        # 直接调用load_cached_data函数，它会读取本地缓存
+        pool_table, candidates_table = load_cached_data(interval)
+        count_text = f"当前显示: {interval}结算周期合约"
         
-        print("🔧 开始构建表格...")
-        result = build_tables(pool_contracts, candidates, interval)
-        print("✅ 缓存数据加载完成")
-        return result
+        print("✅ 本地缓存数据刷新完成")
+        return pool_table, candidates_table, count_text
         
     except Exception as e:
-        error_msg = f"加载缓存数据失败: {str(e)}"
-        print(f"❌ 加载缓存数据异常: {error_msg}")
+        error_msg = f"刷新本地缓存数据失败: {str(e)}"
+        print(f"❌ 刷新本地缓存数据异常: {error_msg}")
         print(f"❌ 异常详情: {traceback.format_exc()}")
-        return f"加载缓存数据失败: {str(e)}", f"加载缓存数据失败: {str(e)}"
+        return f"刷新本地缓存数据失败: {str(e)}", f"刷新本地缓存数据失败: {str(e)}"
         
 def build_tables(pool_contracts, candidates, interval="1h"):
     """构建表格组件"""
     try:
         print(f"🔧 开始构建表格，监控合约: {len(pool_contracts)}, 备选合约: {len(candidates)}, 结算周期: {interval}")
+        
+        def format_time(timestamp):
+            """格式化时间戳为北京时间"""
+            try:
+                if not timestamp:
+                    return "未知"
+                
+                # 如果是字符串，尝试转换为数字
+                if isinstance(timestamp, str):
+                    if timestamp.isdigit():
+                        timestamp = int(timestamp)
+                    else:
+                        return timestamp  # 如果已经是格式化的时间字符串，直接返回
+                
+                # 如果是数字时间戳
+                if isinstance(timestamp, (int, float)):
+                    # 判断是秒还是毫秒时间戳
+                    if timestamp > 1e10:  # 毫秒时间戳
+                        timestamp = timestamp / 1000
+                    
+                    # 转换为北京时间（UTC+8）
+                    from datetime import datetime, timezone, timedelta
+                    utc_time = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+                    beijing_time = utc_time + timedelta(hours=8)
+                    
+                    # 格式化为常见时间格式
+                    return beijing_time.strftime('%Y-%m-%d %H:%M:%S')
+                
+                return str(timestamp)
+            except Exception as e:
+                print(f"⚠️ 时间格式化失败 {timestamp}: {e}")
+                return str(timestamp)
         
         # 构建当前监控合约表格
         if pool_contracts and len(pool_contracts) > 0:
@@ -216,12 +252,15 @@ def build_tables(pool_contracts, candidates, interval="1h"):
                     funding_time = contract.get("funding_time") or contract.get("next_funding_time", "")
                     exchange = contract.get("exchange", "binance")
                     
+                    # 格式化时间
+                    formatted_time = format_time(funding_time)
+                    
                     pool_table_rows.append(
                         html.Tr([
                             html.Td(contract.get("symbol", "")),
                             html.Td(exchange),
                             html.Td(f"{float(funding_rate)*100:.4f}%"),
-                            html.Td(funding_time),
+                            html.Td(formatted_time),
                         ])
                     )
                 except Exception as e:
@@ -245,12 +284,15 @@ def build_tables(pool_contracts, candidates, interval="1h"):
                     funding_time = info.get("funding_time") or info.get("next_funding_time", "")
                     exchange = info.get("exchange", "binance")
                     
+                    # 格式化时间
+                    formatted_time = format_time(funding_time)
+                    
                     candidates_table_rows.append(
                         html.Tr([
                             html.Td(symbol),
                             html.Td(exchange),
                             html.Td(f"{float(funding_rate)*100:.4f}%"),
-                            html.Td(funding_time),
+                            html.Td(formatted_time),
                             html.Td(dbc.Button("查看历史", id={"type": "view-history", "index": symbol}, size="sm", color="info")),
                         ])
                     )
@@ -425,6 +467,57 @@ def get_latest_funding_rates(latest_rates_clicks):
     except Exception as e:
         error_msg = f"❌ 获取最新资金费率异常: {str(e)}"
         return dash.no_update, error_msg, True
+
+# 刷新备选池回调 - 刷新数据并更新页面显示
+@app.callback(
+    Output("pool-contracts-table", "children", allow_duplicate=True),
+    Output("candidates-table", "children", allow_duplicate=True),
+    Output("contract-count-display", "children", allow_duplicate=True),
+    Output("notification", "children", allow_duplicate=True),
+    Output("notification", "is_open", allow_duplicate=True),
+    Input("refresh-candidates-pool-btn", "n_clicks"),
+    State("interval-filter", "value"),  # 获取当前选中的结算周期
+    prevent_initial_call=True
+)
+def refresh_candidates_pool(refresh_pool_clicks, current_interval):
+    """刷新备选池并更新页面显示"""
+    if not refresh_pool_clicks or refresh_pool_clicks <= 0:
+        return dash.no_update, dash.no_update, dash.no_update, "", False
+    
+    try:
+        print("🔄 开始刷新备选池...")
+        
+        # 使用当前选中的结算周期，如果没有选中则默认使用1h
+        interval = current_interval if current_interval else "1h"
+        print(f"📊 当前选中的结算周期: {interval}")
+        
+        # 调用刷新备选池API
+        refresh_resp = requests.post(f"{API_BASE_URL}/funding_monitor/refresh-candidates")
+        if refresh_resp.status_code != 200:
+            error_msg = f"刷新备选池失败: {refresh_resp.text}"
+            print(f"❌ {error_msg}")
+            return dash.no_update, dash.no_update, dash.no_update, error_msg, True
+        
+        print("✅ 备选池刷新成功，开始更新页面显示...")
+        
+        # 等待一下让缓存更新完成
+        import time
+        time.sleep(2)
+        
+        # 重新加载数据
+        pool_table, candidates_table = load_cached_data(interval)
+        count_text = f"当前显示: {interval}结算周期合约 (已刷新)"
+        
+        notification_msg = f"✅ 备选池刷新成功！{interval}结算周期合约数据已更新"
+        
+        print("✅ 页面数据更新完成")
+        return pool_table, candidates_table, count_text, notification_msg, True
+        
+    except Exception as e:
+        error_msg = f"刷新备选池异常: {str(e)}"
+        print(f"❌ {error_msg}")
+        print(f"❌ 异常详情: {traceback.format_exc()}")
+        return dash.no_update, dash.no_update, dash.no_update, error_msg, True
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8050)

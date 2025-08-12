@@ -2,12 +2,13 @@ from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import threading
 import time
 import traceback
 import os
+import requests # Added for direct API calls
 
 from utils.models import Strategy, SessionLocal, get_db
 from strategies.factory import StrategyFactory
@@ -69,246 +70,7 @@ def create_funding_monitor(params: dict = None):
     
     funding_monitor_instance = FundingRateMonitor(default_params)
     return funding_monitor_instance
-
-def funding_monitor_loop():
-    """资金费率监控循环"""
-    global funding_monitor_running, funding_monitor_instance
     
-    while funding_monitor_running:
-        try:
-            if funding_monitor_instance:
-                # 获取监控状态
-                status = funding_monitor_instance.get_pool_status()
-                
-                # 这里可以添加更多的监控逻辑
-                # 比如检查监控是否正常运行，发送定期报告等
-                
-            time.sleep(60)  # 每分钟检查一次
-            
-        except Exception as e:
-            print(f"资金费率监控错误: {e}")
-            time.sleep(30)
-
-# 策略管理API
-@app.get("/strategies", response_model=List[Dict[str, Any]])
-def get_strategies(db: SessionLocal = Depends(get_db)):
-    """获取所有策略"""
-    try:
-        strategies = db.query(Strategy).filter(Strategy.strategy_type == "funding_rate_arbitrage").all()
-        return [
-            {
-                "id": s.id,
-                "name": s.name,
-                "description": s.description,
-                "strategy_type": s.strategy_type,
-                "parameters": s.get_parameters(),
-                "is_active": s.is_active,
-                "created_at": s.created_at.isoformat(),
-                "updated_at": s.updated_at.isoformat()
-            }
-            for s in strategies
-        ]
-    except Exception as e:
-        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"获取策略失败: {str(e)}")
-
-@app.get("/strategies/available")
-def get_available_strategies():
-    """获取可用策略类型"""
-    try:
-        strategies = StrategyFactory.get_available_strategies()
-        return {
-            "strategies": [
-                {
-                    "type": s,
-                    "name": "资金费率监控策略"
-                }
-                for s in strategies
-            ]
-        }
-    except Exception as e:
-        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"获取可用策略失败: {str(e)}")
-
-@app.post("/strategies", response_model=Dict[str, Any])
-def create_strategy(strategy: StrategyCreate, db: SessionLocal = Depends(get_db)):
-    """创建新策略"""
-    try:
-        # 验证策略类型
-        if strategy.strategy_type not in StrategyFactory.get_available_strategies():
-            raise HTTPException(status_code=400, detail="不支持的策略类型")
-        
-        # 检查策略名称是否已存在
-        existing = db.query(Strategy).filter(Strategy.name == strategy.name).first()
-        if existing:
-            raise HTTPException(status_code=400, detail="策略名称已存在")
-        
-        # 创建策略
-        db_strategy = Strategy(
-            name=strategy.name,
-            description=strategy.description,
-            strategy_type=strategy.strategy_type,
-            parameters=json.dumps(strategy.parameters or {})
-        )
-        
-        db.add(db_strategy)
-        db.commit()
-        db.refresh(db_strategy)
-        
-        return {
-            "id": db_strategy.id,
-            "name": db_strategy.name,
-            "description": db_strategy.description,
-            "strategy_type": db_strategy.strategy_type,
-            "parameters": db_strategy.get_parameters(),
-            "is_active": db_strategy.is_active,
-            "created_at": db_strategy.created_at.isoformat()
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"创建策略失败: {str(e)}")
-
-@app.put("/strategies/{strategy_id}", response_model=Dict[str, Any])
-def update_strategy(strategy_id: int, strategy_update: StrategyUpdate, 
-                   db: SessionLocal = Depends(get_db)):
-    """更新策略"""
-    try:
-        # 查找策略
-        db_strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
-        if not db_strategy:
-            raise HTTPException(status_code=404, detail="策略不存在")
-        
-        # 更新策略
-        if strategy_update.name is not None:
-            db_strategy.name = strategy_update.name
-        if strategy_update.description is not None:
-            db_strategy.description = strategy_update.description
-        if strategy_update.parameters is not None:
-            db_strategy.parameters = json.dumps(strategy_update.parameters)
-        if strategy_update.is_active is not None:
-            db_strategy.is_active = strategy_update.is_active
-        
-        db.commit()
-        db.refresh(db_strategy)
-        
-        return {
-            "id": db_strategy.id,
-            "name": db_strategy.name,
-            "description": db_strategy.description,
-            "strategy_type": db_strategy.strategy_type,
-            "parameters": db_strategy.get_parameters(),
-            "is_active": db_strategy.is_active,
-            "updated_at": db_strategy.updated_at.isoformat()
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"更新策略失败: {str(e)}")
-
-@app.delete("/strategies/{strategy_id}")
-def delete_strategy(strategy_id: int, db: SessionLocal = Depends(get_db)):
-    """删除策略"""
-    try:
-        # 查找策略
-        db_strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
-        if not db_strategy:
-            raise HTTPException(status_code=404, detail="策略不存在")
-        
-        db.delete(db_strategy)
-        db.commit()
-        
-        return {"message": "策略删除成功"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"接口发生异常: {e}\n{traceback.format_exc()}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"删除策略失败: {str(e)}")
-
-# 资金费率监控API
-@app.post("/funding_monitor/start")
-def start_funding_monitor(request: FundingMonitorRequest = None, background_tasks: BackgroundTasks = None):
-    """初始化资金费率监控（不自动启动）"""
-    global funding_monitor_running, funding_monitor_thread
-    
-    try:
-        if funding_monitor_running:
-            return {"status": "success", "message": "资金费率监控已经在运行中"}
-        
-        # 创建监控实例
-        params = request.parameters if request else None
-        create_funding_monitor(params)
-        
-        # 只初始化，不启动自动监控
-        funding_monitor_running = False  # 设置为False，表示不自动运行
-        
-        send_telegram_message("资金费率监控已初始化（手动模式）")
-        return {
-            "status": "success", 
-            "message": "资金费率监控已初始化，可通过Web界面手动触发操作",
-            "mode": "manual"
-        }
-        
-    except Exception as e:
-        print(f"初始化资金费率监控异常: {e}\n{traceback.format_exc()}")
-        funding_monitor_running = False
-        raise HTTPException(status_code=500, detail=f"初始化监控失败: {str(e)}")
-
-@app.post("/funding_monitor/stop")
-def stop_funding_monitor():
-    """停止资金费率监控"""
-    global funding_monitor_running, funding_monitor_instance
-    
-    try:
-        if not funding_monitor_running:
-            return {"status": "success", "message": "资金费率监控未运行"}
-        
-        funding_monitor_running = False
-        if funding_monitor_instance:
-            funding_monitor_instance.stop_monitoring()
-        
-        send_telegram_message("资金费率监控已停止")
-        return {"status": "success", "message": "资金费率监控已成功停止"}
-        
-    except Exception as e:
-        print(f"停止资金费率监控异常: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"停止监控失败: {str(e)}")
-
-@app.get("/funding_monitor/status")
-def get_funding_monitor_status():
-    """获取资金费率监控状态"""
-    global funding_monitor_running, funding_monitor_instance
-    
-    try:
-        if not funding_monitor_running or not funding_monitor_instance:
-            return {
-                "running": False,
-                "status": "监控未运行"
-            }
-        
-        # 获取监控状态
-        pool_status = funding_monitor_instance.get_pool_status()
-        
-        return {
-            "running": True,
-            "pool_status": pool_status,
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        print(f"获取资金费率监控状态异常: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"获取监控状态失败: {str(e)}")
-
-# 移除重复的路由定义，保留下面的 get_funding_pool 函数
-
 # 数据API
 @app.get("/symbols")
 def get_symbols():
@@ -370,54 +132,190 @@ def get_funding_rates(symbol: Optional[str] = None, exchange: Optional[str] = No
         print(f"获取资金费率异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取资金费率失败: {str(e)}")
 
-# 系统状态API
-@app.get("/system/status")
-def get_system_status():
-    """获取系统状态"""
-    try:
-        return {
-            "status": "ok",
-            "timestamp": datetime.now().isoformat(),
-            "version": "1.0.0",
-            "funding_monitor_running": funding_monitor_running
-        }
-    except Exception as e:
-        print(f"获取系统状态异常: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"获取系统状态失败: {str(e)}")
-
 @app.post("/funding_monitor/refresh-candidates")
 def refresh_funding_candidates():
-    """刷新备选合约池"""
-    global funding_monitor_instance
-
+    """刷新备选合约池 - 使用现成的币安API方法"""
     try:
-        # 如果监控未启动，临时创建一个实例
-        if not funding_monitor_instance:
-            from strategies.funding_rate_arbitrage import FundingRateMonitor
-            funding_monitor_instance = FundingRateMonitor()
-            print("临时创建监控实例用于刷新备选池")
-
-        # 强制刷新合约池
-        funding_monitor_instance.refresh_contract_pool(force_refresh=True)
+        print("🔄 开始刷新备选合约池...")
         
-        # 同时更新所有结算周期合约缓存
+        # 使用现成的方法获取币安数据
+        from utils.binance_funding import get_all_funding_rates, get_all_24h_volumes
+        
         try:
-            from utils.binance_funding import BinanceFunding
-            funding = BinanceFunding()
-            funding.update_all_contracts_cache()
-            print("✅ 所有结算周期合约缓存更新成功")
+            print("📡 正在从币安API获取最新资金费率数据...")
+            funding_rates = get_all_funding_rates()
+            print(f"✅ 获取到 {len(funding_rates)} 个合约的资金费率")
         except Exception as e:
-            print(f"⚠️ 更新所有结算周期合约缓存失败: {e}")
+            error_msg = f"获取资金费率数据失败: {str(e)}"
+            print(f"❌ {error_msg}")
+            # API失败时直接抛出异常，不回退到缓存
+            raise HTTPException(status_code=500, detail=error_msg)
+        
+        try:
+            print("📡 正在从币安API获取最新成交量数据...")
+            volumes = get_all_24h_volumes()
+            print(f"✅ 获取到 {len(volumes)} 个合约的成交量")
+        except Exception as e:
+            error_msg = f"获取成交量数据失败: {str(e)}"
+            print(f"❌ {error_msg}")
+            # API失败时直接抛出异常，不回退到缓存
+            raise HTTPException(status_code=500, detail=error_msg)
+        
+        # 筛选符合条件的合约（资金费率超过阈值）
+        threshold = 0.005  # 0.5%
+        min_volume = 1000000  # 100万USDT
+        
+        filtered_contracts = {}
+        contracts_by_interval = {}  # 按结算周期分组存储
+        
+        for symbol, funding_info in funding_rates.items():
+            try:
+                funding_rate = float(funding_info.get('lastFundingRate', 0))
+                volume_24h = volumes.get(symbol, 0)
+                
+                # 使用现有的专业方法检测结算周期
+                from utils.binance_funding import BinanceFunding
+                funding = BinanceFunding()
+                funding_interval_hours = funding.detect_funding_interval(symbol, "UM")
+                
+                if funding_interval_hours:
+                    # 将结算周期分类到最接近的标准间隔
+                    if abs(funding_interval_hours - 1.0) < 0.1:
+                        funding_interval_hours = 1.0
+                    elif abs(funding_interval_hours - 8.0) < 0.1:
+                        funding_interval_hours = 8.0
+                    elif abs(funding_interval_hours - 4.0) < 0.1:
+                        funding_interval_hours = 4.0
+                    elif abs(funding_interval_hours - 2.0) < 0.1:
+                        funding_interval_hours = 2.0
+                    elif abs(funding_interval_hours - 12.0) < 0.1:
+                        funding_interval_hours = 12.0
+                    elif abs(funding_interval_hours - 24.0) < 0.1:
+                        funding_interval_hours = 24.0
+                    else:
+                        # 其他间隔，按小时四舍五入
+                        funding_interval_hours = round(funding_interval_hours)
+                    
+                    print(f"  📊 {symbol}: 检测到结算周期 {funding_interval_hours}h")
+                else:
+                    funding_interval_hours = 1.0  # 默认值
+                    print(f"  ⚠️ {symbol}: 无法检测结算周期，使用默认值1h")
+                
+                # 格式化下次结算时间为北京时间
+                next_funding_timestamp = funding_info.get('nextFundingTime', '')
+                next_funding_time_str = ''
+                if next_funding_timestamp:
+                    try:
+                        # 转换为北京时间
+                        next_time = datetime.fromtimestamp(int(next_funding_timestamp) / 1000)
+                        beijing_time = next_time + timedelta(hours=8)
+                        next_funding_time_str = beijing_time.strftime('%Y-%m-%d %H:%M:%S')
+                    except Exception as e:
+                        print(f"⚠️ 时间格式化失败 {next_funding_timestamp}: {e}")
+                        next_funding_time_str = str(next_funding_timestamp)
+                
+                # 构建合约信息
+                contract_info = {
+                    'symbol': symbol,
+                    'contract_type': 'UM',
+                    'current_funding_rate': funding_rate,
+                    'next_funding_time': next_funding_time_str,
+                    'funding_interval_hours': funding_interval_hours,
+                    'mark_price': float(funding_info.get('markPrice', 0)),
+                    'index_price': float(funding_info.get('indexPrice', 0)),
+                    'volume_24h': volume_24h,
+                    'last_updated': datetime.now().isoformat()
+                }
+                
+                # 按结算周期分组存储
+                interval_key = f"{int(funding_interval_hours)}h"
+                if interval_key not in contracts_by_interval:
+                    contracts_by_interval[interval_key] = {}
+                contracts_by_interval[interval_key][symbol] = contract_info
+                
+                # 筛选符合条件的合约
+                if abs(funding_rate) >= threshold and volume_24h >= min_volume:
+                    filtered_contracts[symbol] = contract_info
+                    
+            except (ValueError, TypeError) as e:
+                print(f"⚠️ 处理合约 {symbol} 时出错: {e}")
+                continue
+        
+        # 保存到监控合约缓存
+        monitor_cache = {
+            'cache_time': datetime.now().isoformat(),
+            'contracts': filtered_contracts,
+            'count': len(filtered_contracts),
+            'threshold': threshold,
+            'min_volume': min_volume
+        }
+        
+        os.makedirs("cache", exist_ok=True)
+        with open("cache/funding_rate_contracts.json", 'w', encoding='utf-8') as f:
+            json.dump(monitor_cache, f, ensure_ascii=False, indent=2)
+        
+        # 为每个结算周期创建对应的缓存文件
+        intervals_found = []
+        total_contracts = 0
+        
+        for interval, contracts in contracts_by_interval.items():
+            if contracts:  # 只保存有合约的结算周期
+                intervals_found.append(interval)
+                total_contracts += len(contracts)
+                
+                # 保存到对应结算周期的缓存文件
+                interval_cache_data = {
+                    'cache_time': datetime.now().isoformat(),
+                    'contracts': contracts,
+                    'interval': interval,
+                    'contract_count': len(contracts)
+                }
+                
+                cache_filename = f"cache/{interval}_funding_contracts_full.json"
+                with open(cache_filename, 'w', encoding='utf-8') as f:
+                    json.dump(interval_cache_data, f, ensure_ascii=False, indent=2)
+                
+                print(f"📊 {interval}结算周期合约: {len(contracts)}个")
+        
+        # 保存到主缓存
+        main_cache_data = {
+            'cache_time': datetime.now().isoformat(),
+            'contracts_by_interval': contracts_by_interval,
+            'total_scanned': len(funding_rates),
+            'intervals_found': intervals_found
+        }
+        
+        with open("cache/all_funding_contracts_full.json", 'w', encoding='utf-8') as f:
+            json.dump(main_cache_data, f, ensure_ascii=False, indent=2)
+        
+        print(f"✅ 监控合约池更新完成，共 {len(filtered_contracts)} 个符合条件合约")
+        print(f"📊 总计: {total_contracts}个合约，结算周期: {', '.join(intervals_found)}")
+        
+        # 发送Telegram通知
+        try:
+            from utils.notifier import send_telegram_message
+            message = f"🔄 备选合约池已刷新\n" \
+                     f"📊 总计: {total_contracts}个合约，结算周期: {', '.join(intervals_found)}\n" \
+                     f"🎯 符合条件合约: {len(filtered_contracts)}个\n" \
+                     f"⏰ 更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            send_telegram_message(message)
+        except Exception as e:
+            print(f"⚠️ 发送Telegram通知失败: {e}")
         
         return {
             "status": "success",
-            "message": "备选合约池刷新成功，包括最新资金费率数据和所有结算周期合约缓存",
-            "timestamp": datetime.now().isoformat()
+            "message": "备选合约池刷新成功（使用最新数据）",
+            "timestamp": datetime.now().isoformat(),
+            "contracts_count": total_contracts,
+            "filtered_count": len(filtered_contracts),
+            "intervals_found": intervals_found
         }
 
     except Exception as e:
         print(f"刷新备选合约池异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"刷新备选合约池失败: {str(e)}")
+
+
 
 @app.get("/funding_monitor/pool")
 def get_funding_pool():
@@ -429,17 +327,29 @@ def get_funding_pool():
             with open(cache_file, 'r', encoding='utf-8') as f:
                 cached_data = json.load(f)
             
+            # 检查新的缓存格式
+            if 'contracts' in cached_data:
+                # 新格式：{"contracts": {...}, "count": ..., ...}
+                contracts = cached_data.get('contracts', {})
+            else:
+                # 旧格式：直接是合约数据
+                contracts = cached_data
+            
             # 转换为列表格式，包含合约详细信息
             contracts_list = []
-            for symbol, info in cached_data.items():
-                contracts_list.append({
-                    "symbol": symbol,
-                    "exchange": info.get("exchange", "binance"),
-                    "funding_rate": float(info.get("current_funding_rate", 0)),
-                    "funding_time": info.get("next_funding_time", ""),
-                    "volume_24h": info.get("volume_24h", 0),
-                    "mark_price": info.get("mark_price", 0)
-                })
+            for symbol, info in contracts.items():
+                try:
+                    contracts_list.append({
+                        "symbol": symbol,
+                        "exchange": info.get("exchange", "binance"),
+                        "funding_rate": float(info.get("current_funding_rate", 0)),
+                        "funding_time": info.get("next_funding_time", ""),
+                        "volume_24h": info.get("volume_24h", 0),
+                        "mark_price": info.get("mark_price", 0)
+                    })
+                except (ValueError, TypeError) as e:
+                    print(f"⚠️ 处理合约 {symbol} 时出错: {e}")
+                    continue
             
             print(f"📋 从缓存文件加载了 {len(contracts_list)} 个监控合约")
             return {
@@ -592,32 +502,38 @@ def get_contracts_by_interval(interval: str):
         formatted_contracts = {}
         for symbol, info in contracts.items():
             try:
-                # 获取最新的资金费率信息
-                current_info = funding.get_current_funding(symbol, "UM")
-                if current_info:
-                    funding_rate = float(current_info.get('funding_rate', 0))
-                    next_funding_time = current_info.get('next_funding_time')
-                    if next_funding_time:
-                        next_time = datetime.fromtimestamp(next_funding_time / 1000)
-                        funding_time_str = next_time.strftime('%Y-%m-%d %H:%M:%S')
-                    else:
-                        funding_time_str = info.get("next_funding_time", "")
-                else:
-                    funding_rate = float(info.get("current_funding_rate", 0))
-                    funding_time_str = info.get("next_funding_time", "")
+                # 直接使用缓存数据，不调用API获取最新信息
+                funding_rate = float(info.get("current_funding_rate", 0))
+                funding_time_str = info.get("next_funding_time", "")
+                
+                # 格式化时间显示
+                funding_time_display = funding_time_str
+                if funding_time_str and funding_time_str != "未知":
+                    try:
+                        # 如果已经是格式化的时间字符串，直接使用
+                        if isinstance(funding_time_str, str) and "-" in funding_time_str:
+                            funding_time_display = funding_time_str
+                        else:
+                            # 如果是时间戳，转换为北京时间
+                            timestamp = int(funding_time_str)
+                            if timestamp > 1e10:  # 毫秒时间戳
+                                timestamp = timestamp / 1000
+                            next_time = datetime.fromtimestamp(timestamp)
+                            beijing_time = next_time + timedelta(hours=8)
+                            funding_time_display = beijing_time.strftime('%Y-%m-%d %H:%M:%S')
+                    except Exception as e:
+                        print(f"⚠️ 时间格式化失败 {funding_time_str}: {e}")
+                        funding_time_display = str(funding_time_str)
                 
                 formatted_contracts[symbol] = {
                     "symbol": symbol,
                     "exchange": "binance",
                     "funding_rate": funding_rate,
-                    "funding_time": funding_time_str,
+                    "funding_time": funding_time_display,
                     "funding_interval": interval,
                     "volume_24h": info.get("volume_24h", 0),
                     "mark_price": info.get("mark_price", 0)
                 }
-                
-                # 添加小延迟避免API限流
-                time.sleep(0.05)
                 
             except Exception as e:
                 print(f"处理合约 {symbol} 时出错: {e}")

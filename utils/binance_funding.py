@@ -371,21 +371,39 @@ class BinanceFunding:
 
 def get_all_funding_rates():
     """批量获取所有合约的资金费率等信息，返回symbol到资金费率等信息的映射"""
+    from config.proxy_settings import get_proxy_dict
+    
     url = "https://fapi.binance.com/fapi/v1/premiumIndex"
-    resp = requests.get(url, timeout=10)
-    resp.raise_for_status()
-    data = resp.json()
-    # 构建symbol到资金费率等信息的映射
-    data_map = {item['symbol']: item for item in data}
-    return data_map
+    proxies = get_proxy_dict()
+    
+    try:
+        resp = requests.get(url, proxies=proxies, timeout=30, verify=False)
+        resp.raise_for_status()
+        data = resp.json()
+        # 构建symbol到资金费率等信息的映射
+        data_map = {item['symbol']: item for item in data}
+        return data_map
+    except Exception as e:
+        print(f"❌ 获取资金费率失败: {e}")
+        # 抛出异常，让调用者知道API请求失败
+        raise Exception(f"获取资金费率失败: {e}")
 
 def get_all_24h_volumes():
     """批量获取所有合约的24小时成交额（USDT计价），返回symbol到成交额的映射"""
+    from config.proxy_settings import get_proxy_dict
+    
     url = "https://fapi.binance.com/fapi/v1/ticker/24hr"
-    resp = requests.get(url, timeout=10)
-    resp.raise_for_status()
-    data = resp.json()
-    return {item['symbol']: float(item['quoteVolume']) for item in data}
+    proxies = get_proxy_dict()
+    
+    try:
+        resp = requests.get(url, proxies=proxies, timeout=30, verify=False)
+        resp.raise_for_status()
+        data = resp.json()
+        return {item['symbol']: float(item['quoteVolume']) for item in data}
+    except Exception as e:
+        print(f"❌ 获取24小时成交量失败: {e}")
+        # 抛出异常，让调用者知道API请求失败
+        raise Exception(f"获取24小时成交量失败: {e}")
 
 def get_funding_history(symbol, contract_type="UM", limit=1000):
     cache_dir = "data/funding"
@@ -479,6 +497,122 @@ def get_klines(symbol, interval, start_time, end_time):
             return pd.DataFrame()
         except Exception:
             return []
+
+def load_cached_funding_rates():
+    """从缓存加载资金费率数据"""
+    try:
+        # 尝试从多个缓存文件加载数据
+        cache_files = [
+            "cache/funding_rate_contracts.json",
+            "cache/1h_funding_contracts_full.json",
+            "cache/2h_funding_contracts_full.json",
+            "cache/4h_funding_contracts_full.json",
+            "cache/8h_funding_contracts_full.json"
+        ]
+        
+        result = {}
+        
+        for cache_file in cache_files:
+            if os.path.exists(cache_file):
+                try:
+                    with open(cache_file, 'r', encoding='utf-8') as f:
+                        cached_data = json.load(f)
+                        
+                        # 处理不同的缓存格式
+                        if 'contracts' in cached_data:
+                            # 新格式：包含contracts字段
+                            contracts = cached_data['contracts']
+                            for symbol, data in contracts.items():
+                                if isinstance(data, dict):
+                                    result[symbol] = {
+                                        'symbol': symbol,
+                                        'lastFundingRate': data.get('current_funding_rate', '0'),
+                                        'markPrice': data.get('mark_price', '0'),
+                                        'indexPrice': data.get('index_price', '0')
+                                    }
+                        else:
+                            # 旧格式：直接是合约数据
+                            for symbol, data in cached_data.items():
+                                if isinstance(data, dict) and 'funding_rate' in data:
+                                    result[symbol] = {
+                                        'symbol': symbol,
+                                        'lastFundingRate': data['funding_rate'],
+                                        'markPrice': data.get('mark_price', '0'),
+                                        'indexPrice': data.get('index_price', '0')
+                                    }
+                                    
+                except Exception as e:
+                    print(f"⚠️ 读取缓存文件 {cache_file} 失败: {e}")
+                    continue
+        
+        if result:
+            print(f"📋 从缓存加载了 {len(result)} 个合约的资金费率数据")
+            # 标记数据来源为缓存
+            result['_from_cache'] = True
+        else:
+            print("⚠️ 所有缓存文件都无法读取或为空")
+            
+        return result
+        
+    except Exception as e:
+        print(f"❌ 加载缓存资金费率失败: {e}")
+        return {}
+
+def load_cached_24h_volumes():
+    """从缓存加载24小时成交量数据"""
+    try:
+        # 尝试从多个缓存文件加载数据
+        cache_files = [
+            "cache/funding_rate_contracts.json",
+            "cache/1h_funding_contracts_full.json",
+            "cache/2h_funding_contracts_full.json",
+            "cache/4h_funding_contracts_full.json",
+            "cache/8h_funding_contracts_full.json"
+        ]
+        
+        result = {}
+        
+        for cache_file in cache_files:
+            if os.path.exists(cache_file):
+                try:
+                    with open(cache_file, 'r', encoding='utf-8') as f:
+                        cached_data = json.load(f)
+                        
+                        # 处理不同的缓存格式
+                        if 'contracts' in cached_data:
+                            # 新格式：包含contracts字段
+                            contracts = cached_data['contracts']
+                            for symbol, data in contracts.items():
+                                if isinstance(data, dict) and 'volume_24h' in data:
+                                    try:
+                                        result[symbol] = float(data['volume_24h'])
+                                    except (ValueError, TypeError):
+                                        continue
+                        else:
+                            # 旧格式：直接是合约数据
+                            for symbol, data in cached_data.items():
+                                if isinstance(data, dict) and 'volume_24h' in data:
+                                    try:
+                                        result[symbol] = float(data['volume_24h'])
+                                    except (ValueError, TypeError):
+                                        continue
+                                    
+                except Exception as e:
+                    print(f"⚠️ 读取缓存文件 {cache_file} 失败: {e}")
+                    continue
+        
+        if result:
+            print(f"📋 从缓存加载了 {len(result)} 个合约的24小时成交量数据")
+            # 标记数据来源为缓存
+            result['_from_cache'] = True
+        else:
+            print("⚠️ 所有缓存文件都无法读取或为空")
+            
+        return result
+        
+    except Exception as e:
+        print(f"❌ 加载缓存24小时成交量失败: {e}")
+        return {}
 
 # 测试
 if __name__ == "__main__":
