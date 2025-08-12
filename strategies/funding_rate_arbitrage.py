@@ -214,17 +214,6 @@ class FundingRateMonitor(BaseStrategy):
         print("   - 检查资金费率")
         print("   - 更新缓存")
         
-        # 不启动定时任务，等待手动触发
-        # schedule.every(self.parameters['contract_refresh_interval']).minutes.do(self.refresh_contract_pool)
-        # schedule.every(self.parameters['funding_rate_check_interval']).minutes.do(self.check_funding_rates)
-        
-        # 不启动更新线程
-        # if not self._update_threads_started:
-        #     self._update_threads_started = True
-        #     update_thread = threading.Thread(target=self._run_scheduler)
-        #     update_thread.daemon = True
-        #     update_thread.start()
-        #     print("✅ 监控线程已启动")
 
     def _run_scheduler(self):
         """运行调度器"""

@@ -422,21 +422,40 @@ def refresh_funding_candidates():
 @app.get("/funding_monitor/pool")
 def get_funding_pool():
     """获取当前监控合约池"""
-    global funding_monitor_instance
-
     try:
-        if not funding_monitor_instance:
-            from strategies.funding_rate_arbitrage import FundingRateMonitor
-            funding_monitor_instance = FundingRateMonitor()
-            print("临时创建监控实例用于获取合约池数据")
-
-        contracts = funding_monitor_instance.contract_pool
-        return {
-            "status": "success",
-            "contracts": list(contracts),
-            "count": len(contracts),
-            "timestamp": datetime.now().isoformat()
-        }
+        # 直接从缓存文件读取监控合约数据
+        cache_file = "cache/funding_rate_contracts.json"
+        if os.path.exists(cache_file):
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                cached_data = json.load(f)
+            
+            # 转换为列表格式，包含合约详细信息
+            contracts_list = []
+            for symbol, info in cached_data.items():
+                contracts_list.append({
+                    "symbol": symbol,
+                    "exchange": info.get("exchange", "binance"),
+                    "funding_rate": float(info.get("current_funding_rate", 0)),
+                    "funding_time": info.get("next_funding_time", ""),
+                    "volume_24h": info.get("volume_24h", 0),
+                    "mark_price": info.get("mark_price", 0)
+                })
+            
+            print(f"📋 从缓存文件加载了 {len(contracts_list)} 个监控合约")
+            return {
+                "status": "success",
+                "contracts": contracts_list,
+                "count": len(contracts_list),
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            print("📋 监控合约缓存文件不存在")
+            return {
+                "status": "success",
+                "contracts": [],
+                "count": 0,
+                "timestamp": datetime.now().isoformat()
+            }
 
     except Exception as e:
         print(f"获取合约池异常: {e}\n{traceback.format_exc()}")
@@ -445,21 +464,28 @@ def get_funding_pool():
 @app.get("/funding_monitor/candidates")
 def get_funding_candidates():
     """获取备选合约池"""
-    global funding_monitor_instance
-
     try:
-        if not funding_monitor_instance:
-            from strategies.funding_rate_arbitrage import FundingRateMonitor
-            funding_monitor_instance = FundingRateMonitor()
-            print("临时创建监控实例用于获取备选合约数据")
-
-        candidates = funding_monitor_instance.candidate_contracts
-        return {
-            "status": "success",
-            "contracts": candidates,
-            "count": len(candidates),
-            "timestamp": datetime.now().isoformat()
-        }
+        # 直接从缓存文件读取备选合约数据
+        cache_file = "cache/funding_rate_contracts.json"
+        if os.path.exists(cache_file):
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                cached_data = json.load(f)
+            
+            print(f"📋 从缓存文件加载了 {len(cached_data)} 个备选合约")
+            return {
+                "status": "success",
+                "contracts": cached_data,
+                "count": len(cached_data),
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            print("📋 备选合约缓存文件不存在")
+            return {
+                "status": "success",
+                "contracts": {},
+                "count": 0,
+                "timestamp": datetime.now().isoformat()
+            }
 
     except Exception as e:
         print(f"获取备选合约异常: {e}\n{traceback.format_exc()}")

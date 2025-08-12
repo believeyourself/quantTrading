@@ -1,6 +1,40 @@
 {
-  "cache_time": "2025-08-10T18:39:54.453373",
-  "contracts": {},
-  "total_scanned": 545,
-  "h1_contracts_count": 0
+  "cache_time": "2025-08-11T22:10:51.439000",
+  "contracts": {
+    "OMNIUSDT": {
+      "symbol": "OMNIUSDT",
+      "contract_type": "UM",
+      "current_funding_rate": "-0.00065213",
+      "next_funding_time": "2025-08-12 00:00:00",
+      "funding_interval_hours": 0.9999997222222222,
+      "mark_price": "4.52600000",
+      "index_price": "4.52933169",
+      "volume_24h": 9101215.72,
+      "last_updated": "2025-08-11T22:03:08.958655"
+    },
+    "ALPACAUSDT": {
+      "symbol": "ALPACAUSDT",
+      "contract_type": "UM",
+      "current_funding_rate": "0.00000000",
+      "next_funding_time": "2025-08-11 23:00:00",
+      "funding_interval_hours": 1.0,
+      "mark_price": "0.02019803",
+      "index_price": "0.02011000",
+      "volume_24h": 11619631791.0,
+      "last_updated": "2025-08-11T22:03:55.509280"
+    },
+    "MYXUSDT": {
+      "symbol": "MYXUSDT",
+      "contract_type": "UM",
+      "current_funding_rate": "0.00063662",
+      "next_funding_time": "2025-08-12 00:00:00",
+      "funding_interval_hours": 0.9999997222222222,
+      "mark_price": "1.70820000",
+      "index_price": "1.70398603",
+      "volume_24h": 216965183.0,
+      "last_updated": "2025-08-11T22:09:48.231757"
+    }
+  },
+  "interval": "1h",
+  "contract_count": 3
 }
