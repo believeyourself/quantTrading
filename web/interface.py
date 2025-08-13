@@ -4,7 +4,7 @@ import dash_bootstrap_components as dbc
 import requests
 import json
 import traceback
-import datetime
+from datetime import datetime, timezone, timedelta
 import os # Added for file operations
 
 API_BASE_URL = "http://localhost:8000"
@@ -228,7 +228,6 @@ def build_tables(pool_contracts, candidates, interval="1h"):
                         timestamp = timestamp / 1000
                     
                     # 转换为北京时间（UTC+8）
-                    from datetime import datetime, timezone, timedelta
                     utc_time = datetime.fromtimestamp(timestamp, tz=timezone.utc)
                     beijing_time = utc_time + timedelta(hours=8)
                     

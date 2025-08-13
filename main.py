@@ -41,14 +41,26 @@ class MonitorSystem:
             if not self.monitors:
                 self.create_default_monitor()
 
-            # 启动所有监控
-            tasks = []
+            # 启动所有监控（包括定时任务）
+            logger.info("启动监控策略...")
             for monitor in self.monitors:
-                task = asyncio.create_task(monitor.start_monitoring())
-                tasks.append(task)
+                try:
+                    # 启动监控（包括定时任务）
+                    monitor.start_monitoring()
+                    logger.info(f"✅ 监控策略已启动: {monitor.name}")
+                except Exception as e:
+                    logger.error(f"❌ 启动监控策略失败: {e}")
 
-            # 等待所有监控任务完成
-            await asyncio.gather(*tasks)
+            logger.info("✅ 所有监控策略已启动")
+            logger.info("💡 系统将自动执行定时任务")
+            
+            # 保持系统运行
+            while self.running:
+                await asyncio.sleep(1)
+                
+        except Exception as e:
+            logger.error(f"监控系统启动失败: {e}")
+            self.running = False
 
         except Exception as e:
             logger.error(f"监控系统启动失败: {e}")
@@ -188,25 +200,29 @@ def test_data_connection():
         logger.error(f"数据连接测试失败: {e}")
 
 def run_monitor():
-    """初始化监控系统（不自动启动）"""
+    """启动监控系统（包括定时任务）"""
     try:
-        logger.info("初始化资金费率监控系统...")
+        logger.info("启动资金费率监控系统...")
 
         # 创建监控系统实例
         monitor_system = MonitorSystem()
 
-        # 只初始化，不启动监控
-        logger.info("✅ 监控系统初始化完成")
-        logger.info("💡 系统已就绪，可通过Web界面或API手动触发监控操作")
-        logger.info("🌐 启动Web界面: python start_web.py")
-        logger.info("🚀 启动API服务: python start_api.py")
+        # 启动监控系统（包括定时任务）
+        logger.info("🚀 启动监控系统...")
+        asyncio.run(monitor_system.start())
         
-        # 保持程序运行，等待用户操作
-        try:
-            while True:
-                await asyncio.sleep(1)
-        except KeyboardInterrupt:
-            logger.info("系统被用户中断")
+    except KeyboardInterrupt:
+        logger.info("系统被用户中断")
+        # 停止所有监控
+        for monitor in monitor_system.monitors:
+            try:
+                monitor.stop_monitoring()
+            except Exception as e:
+                logger.error(f"停止监控失败: {e}")
+        logger.info("✅ 所有监控已停止")
+    except Exception as e:
+        logger.error(f"监控系统启动失败: {e}")
+        sys.exit(1)
 
     except Exception as e:
         logger.error(f"监控系统初始化失败: {e}")

@@ -198,8 +198,8 @@ def refresh_funding_candidates():
                     
                     print(f"  📊 {symbol}: 检测到结算周期 {funding_interval_hours}h")
                 else:
-                    funding_interval_hours = 1.0  # 默认值
-                    print(f"  ⚠️ {symbol}: 无法检测结算周期，使用默认值1h")
+                    print(f"  ❌ {symbol}: 无法检测结算周期，跳过该合约")
+                    continue  # 直接跳过无法检测结算周期的合约
                 
                 # 格式化下次结算时间为北京时间
                 next_funding_timestamp = funding_info.get('nextFundingTime', '')

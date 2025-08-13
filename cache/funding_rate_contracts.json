@@ -1,7 +1,19 @@
 {
-  "cache_time": "2025-08-12T23:16:14.288741",
-  "contracts": {},
-  "count": 0,
+  "cache_time": "2025-08-13T18:45:13.156704",
+  "contracts": {
+    "SKLUSDT": {
+      "symbol": "SKLUSDT",
+      "contract_type": "UM",
+      "current_funding_rate": -0.00829355,
+      "next_funding_time": "2025-08-14 08:00:00",
+      "funding_interval_hours": 8.0,
+      "mark_price": 0.03097078,
+      "index_price": 0.03127529,
+      "volume_24h": 293625458.72047,
+      "last_updated": "2025-08-13T18:41:18.283781"
+    }
+  },
+  "count": 1,
   "threshold": 0.005,
   "min_volume": 1000000
 }

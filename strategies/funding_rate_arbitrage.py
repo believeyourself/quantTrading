@@ -202,8 +202,29 @@ class FundingRateMonitor(BaseStrategy):
             print(f"❌ 检查资金费率失败: {e}")
 
     def start_monitoring(self):
-        """初始化监控（不自动启动）"""
-        print("🚀 初始化资金费率监控系统...")
+        """启动监控系统（包括定时任务）"""
+        print("🚀 启动资金费率监控系统...")
+        
+        # 初始刷新合约池
+        self.refresh_contract_pool()
+        
+        # 启动定时任务
+        if not self._update_threads_started:
+            self._start_update_threads()
+            self._update_threads_started = True
+        
+        print("✅ 监控系统已启动（自动模式）")
+        print("💡 系统将自动执行以下定时任务：")
+        print(f"   - 合约池刷新: 每{self.parameters['contract_refresh_interval']}秒")
+        print(f"   - 资金费率检查: 每{self.parameters['funding_rate_check_interval']}秒")
+        print("💡 也可通过Web界面或API手动触发操作")
+        
+        # 启动调度器
+        self._run_scheduler()
+    
+    def start_monitoring_manual(self):
+        """初始化监控（手动模式，不启动定时任务）"""
+        print("🚀 初始化资金费率监控系统（手动模式）...")
         
         # 初始刷新合约池
         self.refresh_contract_pool()
@@ -215,15 +236,47 @@ class FundingRateMonitor(BaseStrategy):
         print("   - 更新缓存")
         
 
+    def _start_update_threads(self):
+        """启动定时更新线程"""
+        print("🔄 启动定时更新线程...")
+        
+        # 设置定时任务
+        schedule.every(self.parameters['contract_refresh_interval']).seconds.do(self.refresh_contract_pool)
+        schedule.every(self.parameters['funding_rate_check_interval']).seconds.do(self.check_funding_rates)
+        
+        print(f"✅ 定时任务已设置：")
+        print(f"   📊 合约池刷新: 每{self.parameters['contract_refresh_interval']}秒")
+        print(f"   💰 资金费率检查: 每{self.parameters['funding_rate_check_interval']}秒")
+    
     def _run_scheduler(self):
         """运行调度器"""
+        print("🔄 调度器已启动，开始执行定时任务...")
         while True:
-            schedule.run_pending()
-            time.sleep(1)
+            try:
+                schedule.run_pending()
+                time.sleep(1)
+            except KeyboardInterrupt:
+                print("🛑 调度器被用户中断")
+                break
+            except Exception as e:
+                print(f"❌ 调度器异常: {e}")
+                time.sleep(5)  # 异常时等待5秒再继续
     
     def get_current_pool(self):
         """获取当前合约池"""
         return list(self.contract_pool)
+    
+    def stop_monitoring(self):
+        """停止监控系统"""
+        print("🛑 停止资金费率监控系统...")
+        
+        # 清除所有定时任务
+        schedule.clear()
+        print("✅ 定时任务已清除")
+        
+        # 重置状态
+        self._update_threads_started = False
+        print("✅ 监控系统已停止")
     
     def get_pool_status(self):
         """获取池子状态"""
@@ -231,5 +284,6 @@ class FundingRateMonitor(BaseStrategy):
             "pool_size": len(self.contract_pool),
             "candidate_size": len(self.candidate_contracts),
             "last_update": self.last_update_time.isoformat() if self.last_update_time else None,
-            "cache_valid": self._is_cache_valid()
+            "cache_valid": self._is_cache_valid(),
+            "auto_update": self._update_threads_started
         }
