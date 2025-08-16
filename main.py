@@ -15,7 +15,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from utils.database import init_db, SessionLocal
 from config.settings import settings
-from data.manager import data_manager
+# 内联数据读取功能，不再依赖data模块
 from strategies.factory import StrategyFactory
 from api.routes import app
 from utils.notifier import send_telegram_message
@@ -58,10 +58,6 @@ class MonitorSystem:
             while self.running:
                 await asyncio.sleep(1)
                 
-        except Exception as e:
-            logger.error(f"监控系统启动失败: {e}")
-            self.running = False
-
         except Exception as e:
             logger.error(f"监控系统启动失败: {e}")
             self.running = False
@@ -112,12 +108,12 @@ class MonitorSystem:
             if not existing:
                 # 默认监控配置
                 default_params = {
-                    "funding_rate_threshold": 0.005,
-                    "contract_refresh_interval": 60,
-                    "funding_rate_check_interval": 60,
-                    "max_pool_size": 20,
-                    "min_volume": 1000000,
-                    "exchanges": ["binance", "okx", "bybit"]
+                    "funding_rate_threshold": settings.FUNDING_RATE_THRESHOLD,
+                    "contract_refresh_interval": settings.CONTRACT_REFRESH_INTERVAL,
+                    "funding_rate_check_interval": settings.FUNDING_RATE_CHECK_INTERVAL,
+                    "max_pool_size": settings.MAX_POOL_SIZE,
+                    "min_volume": settings.MIN_VOLUME,
+                    "exchanges": settings.EXCHANGES
                 }
 
                 strategy = Strategy(
@@ -181,14 +177,34 @@ def test_data_connection():
     try:
         logger.info("测试数据连接...")
         
-        # 测试获取交易对列表
-        symbols = data_manager.get_symbols()
+        # 内联数据读取功能
+        symbols = []
+        try:
+            cache_file = "cache/1h_funding_contracts_full.json"
+            if os.path.exists(cache_file):
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    contracts = data.get('contracts', {})
+                    symbols = list(contracts.keys())
+        except Exception as e:
+            logger.warning(f"读取缓存文件失败: {e}")
+        
         logger.info(f"获取到 {len(symbols)} 个交易对")
         
         # 测试获取最新价格
         if symbols:
             test_symbol = symbols[0]
-            price = data_manager.get_latest_price(test_symbol)
+            price = 0
+            try:
+                if os.path.exists(cache_file):
+                    with open(cache_file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        contracts = data.get('contracts', {})
+                        if test_symbol in contracts:
+                            price = contracts[test_symbol].get('mark_price', 0)
+            except Exception as e:
+                logger.warning(f"读取价格失败: {e}")
+            
             if price:
                 logger.info(f"{test_symbol} 最新价格: {price}")
             else:
@@ -224,9 +240,6 @@ def run_monitor():
         logger.error(f"监控系统启动失败: {e}")
         sys.exit(1)
 
-    except Exception as e:
-        logger.error(f"监控系统初始化失败: {e}")
-
 def main():
     """主函数"""
     try:
@@ -240,8 +253,8 @@ def main():
         # 测试数据连接
         test_data_connection()
 
-        # 初始化监控系统（不自动启动）
-        asyncio.run(run_monitor())
+        # 启动监控系统
+        run_monitor()
 
     except Exception as e:
         logger.error(f"系统启动失败: {e}")

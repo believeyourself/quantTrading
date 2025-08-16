@@ -1,21 +1,17 @@
-# 核心依赖 - Python 3.13 兼容版本
+# 核心依赖
 fastapi>=0.104.1
 uvicorn>=0.24.0
 pydantic>=2.5.0
-sqlalchemy>=2.0.42
-alembic>=1.13.0
+sqlalchemy>=2.0.23
 python-multipart>=0.0.6
 
-# Web框架 - 修复 Flask 版本冲突
-flask>=3.0.0,<3.1
+# Web框架
+flask>=3.1.1
 flask-cors>=6.0.1
 
-# 数据处理和分析 - Python 3.13 兼容版本
+# 数据处理和分析
 pandas>=2.2.3
-numpy>=2.1.0
-yfinance>=0.2.28
-ccxt>=4.1.77
-ta>=0.10.2
+numpy>=1.25.2
 
 # 图表和可视化
 plotly>=5.17.0
@@ -26,11 +22,8 @@ dash-bootstrap-components>=1.5.0
 pydantic-settings>=2.1.0
 python-dotenv>=1.0.0
 
-# 异步支持
-aiohttp>=3.9.1
-
 # HTTP请求
-requests>=2.32.4
+requests>=2.31.0
 
 # 定时任务
 schedule>=1.2.0
@@ -41,10 +34,3 @@ loguru>=0.7.2
 # 测试
 pytest>=7.4.3
 pytest-asyncio>=0.21.1
-
-# 币安接口
-binance-interface>=1.0.0
-
-# 移除 stdlib 模块（不应通过 pip 安装）:
-# - sqlite3 (Python 内置)
-# - asyncio (Python 内置)

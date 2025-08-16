@@ -1,11 +1,11 @@
 # 加密货币资金费率监控系统
 
-一个专注于监控1小时资金费率结算合约的系统，支持备选合约管理和入池出池监控。
+一个专注于监控多结算周期资金费率结算合约的系统，支持备选合约管理和入池出池监控。
 
 ## 功能特性
 
 ### 📊 资金费率监控
-- **多结算周期监控**：支持1h、2h、4h、8h、12h、24h等不同结算周期的合约监控
+- **多结算周期监控**：支持1h、2h、4h、8h等不同结算周期的合约监控
 - **智能缓存系统**：为不同结算周期创建独立缓存文件，避免重复扫描
 - **多交易所支持**：支持Binance、OKX、Bybit等主流交易所
 - **费率阈值告警**：当资金费率超过设定阈值时触发通知
@@ -27,7 +27,8 @@
 quantTrading/
 ├── config/                 # 配置模块
 │   ├── __init__.py
-│   └── settings.py        # 系统配置
+│   ├── settings.py        # 系统配置
+│   └── proxy_settings.py  # 代理设置
 ├── data/                  # 数据管理模块
 │   ├── __init__.py
 │   ├── manager.py         # 数据管理器
@@ -46,19 +47,14 @@ quantTrading/
 ├── utils/                # 工具模块
 │   ├── __init__.py
 │   ├── database.py       # 数据库工具
-│   └── models.py         # 数据模型
-├── tests/                # 测试模块
-│   ├── __init__.py
-│   └── system_test.py    # 系统测试
+│   ├── models.py         # 数据模型
+│   ├── binance_funding.py # Binance资金费率工具
+│   └── notifier.py       # 通知工具
+├── cache/                # 缓存目录
 ├── logs/                 # 日志目录
 ├── docs/                 # 文档目录
 ├── main.py               # 主程序
-├── start_web.py          # Web界面启动脚本
-├── start_cache_updaters.py # 缓存更新进程管理器
-├── update_1h_contracts_cache.py # 1小时结算合约缓存更新
-├── update_all_contracts_cache.py # 所有结算周期合约缓存更新
-├── test_multi_interval_cache.py # 多结算周期缓存测试
-├── quick_test_multi_cache.py # 快速测试脚本
+├── start.py              # 统一启动脚本
 ├── requirements.txt      # 依赖包
 ├── env_example.txt       # 环境变量示例
 └── README.md            # 项目说明
@@ -83,63 +79,44 @@ cp env_example.txt .env
 ```
 
 主要配置项：
-- `DATA_SOURCE`: 数据源（ccxt）
 - `TELEGRAM_TOKEN`: Telegram机器人token（用于通知）
 - `TELEGRAM_CHAT_ID`: Telegram聊天ID
-- `EXCHANGES`: 要监控的交易所列表
 
 ### 4. 启动系统
 
-#### 方法一：启动Web界面
+#### 使用统一启动脚本（推荐）
 ```bash
-python start_web.py
-# 或者双击 start_web.bat
+# 交互式菜单
+python start.py
+
+# 命令行模式
+python start.py web      # 启动Web界面
+python start.py api      # 启动API服务
+python start.py main     # 启动主程序
+python start.py all      # 启动所有服务
 ```
 
-#### 方法二：直接运行主程序
+#### 直接启动
 ```bash
+# 启动主程序（监控系统）
 python main.py
-```
 
-#### 方法三：启动缓存更新进程
-```bash
-# 启动所有缓存更新进程
-python start_cache_updaters.py
+# 启动Web界面
+python start.py web
 
-# 或单独启动特定进程
-python update_1h_contracts_cache.py      # 1小时结算合约缓存更新
-python update_all_contracts_cache.py     # 所有结算周期合约缓存更新
-```
-
-#### 方法四：测试多结算周期缓存功能
-```bash
-# 快速测试
-python quick_test_multi_cache.py
-
-# 完整测试
-python test_multi_interval_cache.py
+# 启动API服务
+python start.py api
 ```
 
 **访问地址**：
 - Web界面：http://localhost:8050
+- API服务：http://localhost:8000
 
 ## 使用指南
 
 ### 1. 资金费率监控策略
 
-**配置示例**：
-```json
-{
-    "funding_rate_threshold": 0.005,    // 资金费率阈值 (0.5%)
-    "contract_refresh_interval": 60,    // 合约池刷新间隔(分钟)
-    "funding_rate_check_interval": 60,  // 资金费率检测间隔(秒)
-    "max_pool_size": 20,                // 最大池子大小
-    "min_volume": 1000000,              // 最小24小时成交量
-    "exchanges": ["binance", "okx", "bybit"]  // 支持的交易所
-}
-```
-
-**策略说明**：
+**配置说明**：
 - 自动监控多个交易所的永续合约资金费率
 - 当资金费率绝对值 ≥ 0.5% 时，将合约加入待选池
 - 当资金费率绝对值 < 0.5% 时，将合约移出待选池
@@ -208,3 +185,10 @@ print(f"当前池子有 {pool_status['pool_size']} 个合约")
 2. 更新配置文件和环境变量
 3. 编写测试用例
 4. 更新文档
+
+### 代码结构说明
+
+- **策略模块**：所有交易策略都在 `strategies/` 目录下
+- **数据管理**：数据获取和处理在 `data/` 目录下
+- **工具模块**：通用工具函数在 `utils/` 目录下
+- **配置管理**：系统配置在 `config/` 目录下

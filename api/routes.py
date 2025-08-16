@@ -10,10 +10,11 @@ import traceback
 import os
 import requests # Added for direct API calls
 
-from utils.models import Strategy, SessionLocal, get_db
+from utils.models import Strategy
+from utils.database import SessionLocal, get_db
 from strategies.factory import StrategyFactory
 from strategies.funding_rate_arbitrage import FundingRateMonitor
-from data.manager import data_manager
+# 内联数据读取功能，不再依赖data模块
 from config.settings import settings
 from utils.notifier import send_telegram_message
 
@@ -76,7 +77,18 @@ def create_funding_monitor(params: dict = None):
 def get_symbols():
     """获取所有交易对"""
     try:
-        symbols = data_manager.get_symbols()
+        # 内联数据读取功能
+        symbols = []
+        try:
+            cache_file = "cache/1h_funding_contracts_full.json"
+            if os.path.exists(cache_file):
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    contracts = data.get('contracts', {})
+                    symbols = list(contracts.keys())
+        except Exception as e:
+            print(f"读取缓存文件失败: {e}")
+        
         return {
             "symbols": symbols,
             "count": len(symbols)
