@@ -1,27 +1,27 @@
 {
-  "cache_time": "2025-08-16T22:30:29.998254",
+  "cache_time": "2025-08-17T00:18:31.069347",
   "contracts": {
-    "TROYUSDT": {
-      "symbol": "TROYUSDT",
-      "contract_type": "UM",
-      "current_funding_rate": 0.0,
-      "next_funding_time": "2025-08-17 08:00:00",
-      "funding_interval_hours": 2.0,
-      "mark_price": 0.00033,
-      "index_price": 0.00033,
-      "volume_24h": 44261336.491637,
-      "last_updated": "2025-08-16T22:23:25.950182"
-    },
     "VIDTUSDT": {
       "symbol": "VIDTUSDT",
       "contract_type": "UM",
       "current_funding_rate": 0.0,
-      "next_funding_time": "2025-08-17 08:00:00",
+      "next_funding_time": "2025-08-17 10:00:00",
       "funding_interval_hours": 2.0,
-      "mark_price": 0.00042995,
-      "index_price": 0.0004284,
+      "mark_price": 0.0004291,
+      "index_price": 0.0004291,
       "volume_24h": 116094468.40266,
-      "last_updated": "2025-08-16T22:28:29.035983"
+      "last_updated": "2025-08-17T00:15:31.319999"
+    },
+    "TROYUSDT": {
+      "symbol": "TROYUSDT",
+      "contract_type": "UM",
+      "current_funding_rate": 0.0,
+      "next_funding_time": "2025-08-17 10:00:00",
+      "funding_interval_hours": 2.0,
+      "mark_price": 0.00033,
+      "index_price": 0.00033,
+      "volume_24h": 44261336.491637,
+      "last_updated": "2025-08-17T00:16:13.195709"
     }
   },
   "interval": "2h",

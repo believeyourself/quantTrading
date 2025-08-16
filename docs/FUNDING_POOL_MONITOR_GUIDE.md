@@ -31,7 +31,7 @@ python monitor_funding_pool.py
 
 ### 3. 配置参数
 
-可以通过修改 `config/funding_monitor_config.json` 来调整参数：
+可以通过修改 `config/settings.py` 来调整参数：
 
 ```json
 {
@@ -98,10 +98,10 @@ python monitor_funding_pool.py
 
 ```
 quantTrading/
-├── monitor_funding_pool.py          # 主监控脚本
-├── start_funding_monitor.bat        # Windows启动脚本
 ├── config/
-│   └── funding_monitor_config.json  # 配置文件
+│   ├── __init__.py
+│   ├── settings.py           # 系统配置文件
+│   └── proxy_settings.py     # 代理设置
 ├── cache/
 │   ├── 1h_funding_contracts_full.json  # 1小时结算合约缓存
 │   └── funding_pool_cache.json         # 合约池缓存

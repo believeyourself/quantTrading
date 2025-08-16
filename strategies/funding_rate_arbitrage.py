@@ -14,39 +14,32 @@ class FundingRateMonitor(BaseStrategy):
     """资金费率监控系统 - 监控1小时资金费率结算的合约"""
     
     def __init__(self, parameters: Dict = None):
-        # 首先尝试从配置文件加载参数
-        config_file = "config/funding_monitor_config.json"
-        config_params = {}
+        # 从settings.py加载配置参数
+        from config.settings import settings
         
-        if os.path.exists(config_file):
-            try:
-                with open(config_file, 'r', encoding='utf-8') as f:
-                    config_data = json.load(f)
-                    config_params = {
-                        'funding_rate_threshold': config_data.get('funding_rate_threshold', 0.005),
-                        'max_contracts_in_pool': config_data.get('max_contracts_in_pool', 20),
-                        'min_volume': config_data.get('min_volume_24h', 1000000),
-                        'cache_duration': config_data.get('cache_settings', {}).get('pool_cache_duration', 7200),
-                        'update_interval': config_data.get('scan_interval_seconds', 1800),
-                        'contract_refresh_interval': 60, # 合约池刷新间隔（秒，1小时）
-                        'funding_rate_check_interval': 30, # 资金费率检测间隔（秒，5分钟）
-                    }
-                print(f"📋 从配置文件加载参数: funding_rate_threshold={config_params['funding_rate_threshold']:.4%}")
-            except Exception as e:
-                print(f"⚠️ 读取配置文件失败: {e}")
+        config_params = {
+            'funding_rate_threshold': settings.FUNDING_RATE_THRESHOLD,
+            'max_contracts_in_pool': settings.MAX_POOL_SIZE,
+            'min_volume': settings.MIN_VOLUME,
+            'cache_duration': settings.CACHE_DURATION,
+            'update_interval': settings.UPDATE_INTERVAL,
+            'contract_refresh_interval': settings.CONTRACT_REFRESH_INTERVAL,
+            'funding_rate_check_interval': settings.FUNDING_RATE_CHECK_INTERVAL,
+        }
+        print(f"📋 从settings.py加载参数: funding_rate_threshold={config_params['funding_rate_threshold']:.4%}")
         
-        # 默认参数
+        # 默认参数（作为后备）
         default_params = {
             'funding_rate_threshold': 0.005,  # 0.5% 阈值
             'max_contracts_in_pool': 20,      # 池子里最大合约数量
             'min_volume': 1000000,            # 最小24小时成交量
             'cache_duration': 7200,           # 缓存时间（秒）
             'update_interval': 1800,          # 更新间隔（秒，30分钟）
-            'contract_refresh_interval': 60,  # 合约池刷新间隔（秒，1小时）
-            'funding_rate_check_interval': 30,# 资金费率检测间隔（秒，5分钟）
+            'contract_refresh_interval': 3600,  # 合约池刷新间隔（秒，1小时）
+            'funding_rate_check_interval': 300,# 资金费率检测间隔（秒，5分钟）
         }
         
-        # 合并参数
+        # 合并参数：settings.py > 传入参数 > 默认参数
         params = {**default_params, **(parameters or {}), **config_params}
         super().__init__("资金费率监控系统", params)
         

@@ -214,5 +214,5 @@ strategy_params = {
 
 - `strategies/funding_rate_arbitrage.py`: 策略实现
 - `config/contract_manager.py`: 合约配置管理器
-- `config/funding_contracts.json`: 合约配置文件
+- `config/settings.py`: 系统配置文件
 - `test_funding_with_refresh.py`: 测试脚本 
