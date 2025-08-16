@@ -1,16 +1,16 @@
 {
-  "cache_time": "2025-08-13T18:45:13.156704",
+  "cache_time": "2025-08-16T22:30:29.987239",
   "contracts": {
-    "SKLUSDT": {
-      "symbol": "SKLUSDT",
+    "CTSIUSDT": {
+      "symbol": "CTSIUSDT",
       "contract_type": "UM",
-      "current_funding_rate": -0.00829355,
-      "next_funding_time": "2025-08-14 08:00:00",
+      "current_funding_rate": -0.00606423,
+      "next_funding_time": "2025-08-17 08:00:00",
       "funding_interval_hours": 8.0,
-      "mark_price": 0.03097078,
-      "index_price": 0.03127529,
-      "volume_24h": 293625458.72047,
-      "last_updated": "2025-08-13T18:41:18.283781"
+      "mark_price": 0.1021,
+      "index_price": 0.1023832,
+      "volume_24h": 240823699.4089,
+      "last_updated": "2025-08-16T22:29:58.852143"
     }
   },
   "count": 1,

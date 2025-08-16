@@ -1,18 +1,29 @@
 {
-  "cache_time": "2025-08-13T18:45:13.166856",
+  "cache_time": "2025-08-16T22:30:29.997796",
   "contracts": {
     "ALPACAUSDT": {
       "symbol": "ALPACAUSDT",
       "contract_type": "UM",
       "current_funding_rate": 0.0,
-      "next_funding_time": "2025-08-14 03:00:00",
+      "next_funding_time": "2025-08-17 07:00:00",
       "funding_interval_hours": 1.0,
-      "mark_price": 0.02067699,
-      "index_price": 0.02086,
+      "mark_price": 0.02117568,
+      "index_price": 0.02121,
       "volume_24h": 2911352253.74508,
-      "last_updated": "2025-08-13T18:38:16.796399"
+      "last_updated": "2025-08-16T22:21:57.156920"
+    },
+    "MYXUSDT": {
+      "symbol": "MYXUSDT",
+      "contract_type": "UM",
+      "current_funding_rate": 1.25e-05,
+      "next_funding_time": "2025-08-17 07:00:00",
+      "funding_interval_hours": 1.0,
+      "mark_price": 2.0802,
+      "index_price": 2.07991649,
+      "volume_24h": 648766178.74817,
+      "last_updated": "2025-08-16T22:24:53.648001"
     }
   },
   "interval": "1h",
-  "contract_count": 1
+  "contract_count": 2
 }
