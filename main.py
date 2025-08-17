@@ -7,6 +7,7 @@ import os
 import sys
 import asyncio
 import json
+import signal
 from loguru import logger
 from datetime import datetime
 
@@ -27,6 +28,15 @@ class MonitorSystem:
     def __init__(self):
         self.monitors = []
         self.running = False
+        # 设置信号处理器
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+    
+    def _signal_handler(self, signum, frame):
+        """信号处理器"""
+        logger.info(f"收到信号 {signum}，正在停止监控系统...")
+        self.stop()
+        sys.exit(0)
 
     async def start(self):
         """启动监控系统"""
@@ -217,6 +227,7 @@ def test_data_connection():
 
 def run_monitor():
     """启动监控系统（包括定时任务）"""
+    monitor_system = None
     try:
         logger.info("启动资金费率监控系统...")
 
@@ -229,16 +240,19 @@ def run_monitor():
         
     except KeyboardInterrupt:
         logger.info("系统被用户中断")
-        # 停止所有监控
-        for monitor in monitor_system.monitors:
-            try:
-                monitor.stop_monitoring()
-            except Exception as e:
-                logger.error(f"停止监控失败: {e}")
-        logger.info("✅ 所有监控已停止")
     except Exception as e:
         logger.error(f"监控系统启动失败: {e}")
-        sys.exit(1)
+    finally:
+        # 确保在退出时停止所有监控
+        if monitor_system:
+            logger.info("正在停止所有监控...")
+            try:
+                monitor_system.stop()
+                logger.info("✅ 所有监控已停止")
+            except Exception as e:
+                logger.error(f"停止监控时发生错误: {e}")
+        
+        logger.info("监控系统已退出")
 
 def main():
     """主函数"""

@@ -9,7 +9,10 @@ import os # Added for file operations
 
 API_BASE_URL = "http://localhost:8000"
 
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+app = dash.Dash(__name__, external_stylesheets=[
+    dbc.themes.BOOTSTRAP,
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+])
 app.title = "加密货币资金费率监控系统"
 
 def load_cached_data(interval="1h"):
@@ -50,28 +53,54 @@ def load_cached_data(interval="1h"):
 
         # 直接读取指定结算周期的缓存文件
         candidates = {}
+        update_time = "未知"
         try:
             cache_file = f"cache/{interval}_funding_contracts_full.json"
             if os.path.exists(cache_file):
                 with open(cache_file, 'r', encoding='utf-8') as f:
                     cache_data = json.load(f)
                     candidates = cache_data.get('contracts', {})
+                    # 获取缓存时间
+                    cache_time = cache_data.get('cache_time', '')
+                    if cache_time:
+                        try:
+                            # 解析缓存时间并格式化为北京时间
+                            from datetime import datetime, timezone, timedelta
+                            if 'T' in cache_time:
+                                # ISO格式时间
+                                dt = datetime.fromisoformat(cache_time.replace('Z', '+00:00'))
+                            else:
+                                # 其他格式，尝试解析
+                                dt = datetime.strptime(cache_time, '%Y-%m-%d %H:%M:%S')
+                            
+                            # 转换为北京时间
+                            if dt.tzinfo is None:
+                                dt = dt.replace(tzinfo=timezone.utc)
+                            beijing_time = dt.astimezone(timezone(timedelta(hours=8)))
+                            update_time = beijing_time.strftime('%Y-%m-%d %H:%M:%S')
+                        except Exception as e:
+                            print(f"⚠️ 解析缓存时间失败: {e}")
+                            update_time = cache_time
+                    
                     print(f"📋 从本地缓存加载了 {len(candidates)} 个{interval}结算周期合约")
+                    print(f"📅 缓存时间: {update_time}")
             else:
                 print(f"📋 {interval}结算周期缓存文件不存在: {cache_file}")
         except Exception as e:
             print(f"⚠️ 读取{interval}结算周期缓存失败: {e}")
         
         print("🔧 开始构建表格...")
-        result = build_tables(pool_contracts, candidates, interval)
+        result = build_tables(pool_contracts, candidates, interval, update_time)
         print("✅ 本地缓存数据加载完成")
-        return result
+        return result, update_time
         
     except Exception as e:
         error_msg = f"加载本地缓存数据失败: {str(e)}"
         print(f"❌ 加载本地缓存数据异常: {error_msg}")
         print(f"❌ 异常详情: {traceback.format_exc()}")
-        return f"加载本地缓存数据失败: {str(e)}", f"加载本地缓存数据失败: {str(e)}"
+        # 返回错误信息作为表格内容，保持返回结构一致
+        error_table = html.P(f"❌ {error_msg}", className="text-danger")
+        return (error_table, error_table), "加载失败"
 
 app.layout = dbc.Container([
     # 页面初始化触发器
@@ -92,6 +121,16 @@ app.layout = dbc.Container([
                     dbc.Button("🔄 刷新合约数据", id="refresh-candidates-btn", color="info", className="me-2 mb-2"),
                     dbc.Button("📊 获取最新资金费率", id="get-latest-rates-btn", color="success", className="me-2 mb-2"),
                     dbc.Button("♻️ 刷新备选池", id="refresh-candidates-pool-btn", color="primary", className="mb-2"),
+                    # 资金费率更新时间显示
+                    dbc.Row([
+                        dbc.Col([
+                            html.Div([
+                                html.I(className="fas fa-clock me-2"),
+                                html.Span("资金费率更新时间: ", className="text-muted"),
+                                html.Span(id="funding-rate-update-time", className="fw-bold text-info")
+                            ], className="mt-2 mb-3 p-2 bg-light rounded")
+                        ], width=12)
+                    ]),
                     html.H4("当前监控合约"),
                     html.Div(id="pool-contracts-table", className="mb-4"),
                     html.H4("备选合约"),
@@ -151,35 +190,40 @@ def unified_notification_callback(refresh_pool_clicks):
     Output("pool-contracts-table", "children"),
     Output("candidates-table", "children"),
     Output("contract-count-display", "children"),
+    Output("funding-rate-update-time", "children"),
     Input("page-store", "data")
 )
 def initialize_page(data):
     """页面初始化时只加载缓存数据，不主动更新"""
     print(f"🚀 页面初始化 - 加载缓存数据")
-    pool_table, candidates_table = load_cached_data("1h")  # 默认加载1小时结算周期
+    result, update_time = load_cached_data("1h")  # 默认加载1小时结算周期
+    pool_table, candidates_table = result
     count_text = "当前显示: 1h结算周期合约"
-    return pool_table, candidates_table, count_text
+    return pool_table, candidates_table, count_text, update_time
 
 # 结算周期筛选回调
 @app.callback(
     Output("pool-contracts-table", "children", allow_duplicate=True),
     Output("candidates-table", "children", allow_duplicate=True),
     Output("contract-count-display", "children", allow_duplicate=True),
+    Output("funding-rate-update-time", "children", allow_duplicate=True),
     Input("interval-filter", "value"),
     prevent_initial_call=True
 )
 def filter_by_interval(interval):
     """根据结算周期筛选合约数据"""
     print(f"🔄 切换结算周期: {interval}")
-    pool_table, candidates_table = load_cached_data(interval)
+    result, update_time = load_cached_data(interval)
+    pool_table, candidates_table = result
     count_text = f"当前显示: {interval}结算周期合约"
-    return pool_table, candidates_table, count_text
+    return pool_table, candidates_table, count_text, update_time
 
 # 刷新合约数据回调 - 只在用户点击刷新按钮时触发
 @app.callback(
     Output("pool-contracts-table", "children", allow_duplicate=True),
     Output("candidates-table", "children", allow_duplicate=True),
     Output("contract-count-display", "children", allow_duplicate=True),
+    Output("funding-rate-update-time", "children", allow_duplicate=True),
     Input("refresh-candidates-btn", "n_clicks"),
     State("interval-filter", "value"),  # 获取当前选中的结算周期
     prevent_initial_call=True
@@ -192,20 +236,21 @@ def update_candidates_data(refresh_clicks, current_interval):
         print(f"🔄 刷新按钮点击 - 重新加载本地缓存数据，结算周期: {interval}")
         
         # 直接调用load_cached_data函数，它会读取本地缓存
-        pool_table, candidates_table = load_cached_data(interval)
+        result, update_time = load_cached_data(interval)
+        pool_table, candidates_table = result
         count_text = f"当前显示: {interval}结算周期合约"
         
         print("✅ 本地缓存数据刷新完成")
         print("🔄 表格数据已刷新，历史按钮功能正常")
-        return pool_table, candidates_table, count_text
+        return pool_table, candidates_table, count_text, update_time
         
     except Exception as e:
         error_msg = f"刷新本地缓存数据失败: {str(e)}"
         print(f"❌ 刷新本地缓存数据异常: {error_msg}")
         print(f"❌ 异常详情: {traceback.format_exc()}")
-        return f"刷新本地缓存数据失败: {str(e)}", f"刷新本地缓存数据失败: {str(e)}"
+        return f"刷新本地缓存数据失败: {str(e)}", f"刷新本地缓存数据失败: {str(e)}", "刷新失败"
         
-def build_tables(pool_contracts, candidates, interval="1h"):
+def build_tables(pool_contracts, candidates, interval="1h", update_time="未知"):
     """构建表格组件"""
     try:
         print(f"🔧 开始构建表格，监控合约: {len(pool_contracts)}, 备选合约: {len(candidates)}, 结算周期: {interval}")
@@ -244,7 +289,15 @@ def build_tables(pool_contracts, candidates, interval="1h"):
         # 构建当前监控合约表格
         if pool_contracts and len(pool_contracts) > 0:
             print(f"🔧 构建监控合约表格，共 {len(pool_contracts)} 个合约")
-            pool_table_header = [html.Thead(html.Tr([html.Th("合约名称"), html.Th("交易所"), html.Th("当前资金费率"), html.Th("上一次结算时间")]))]
+            pool_table_header = [html.Thead(html.Tr([
+                html.Th("合约名称"), 
+                html.Th("交易所"), 
+                html.Th("当前资金费率"), 
+                html.Th("上一次结算时间"),
+                html.Th("24小时成交量"),
+                html.Th("标记价格"),
+                html.Th("缓存时间")
+            ]))]
             pool_table_rows = []
             for contract in pool_contracts:
                 try:
@@ -252,9 +305,15 @@ def build_tables(pool_contracts, candidates, interval="1h"):
                     funding_rate = contract.get("funding_rate") or contract.get("current_funding_rate", 0)
                     funding_time = contract.get("funding_time") or contract.get("next_funding_time", "")
                     exchange = contract.get("exchange", "binance")
+                    volume_24h = contract.get("volume_24h", 0)
+                    mark_price = contract.get("mark_price", 0)
                     
                     # 格式化时间
                     formatted_time = format_time(funding_time)
+                    
+                    # 格式化成交量和价格
+                    formatted_volume = f"{float(volume_24h):,.0f}" if volume_24h else "未知"
+                    formatted_price = f"${float(mark_price):.4f}" if mark_price else "未知"
                     
                     pool_table_rows.append(
                         html.Tr([
@@ -262,6 +321,9 @@ def build_tables(pool_contracts, candidates, interval="1h"):
                             html.Td(exchange),
                             html.Td(f"{float(funding_rate)*100:.4f}%"),
                             html.Td(formatted_time),
+                            html.Td(formatted_volume),
+                            html.Td(formatted_price),
+                            html.Td(update_time),  # 使用全局的update_time
                         ])
                     )
                 except Exception as e:
@@ -290,7 +352,10 @@ def build_tables(pool_contracts, candidates, interval="1h"):
                 html.Th("合约名称"), 
                 html.Th("交易所"), 
                 funding_rate_header, 
-                html.Th("上一次结算时间"), 
+                html.Th("上一次结算时间"),
+                html.Th("24小时成交量"),
+                html.Th("标记价格"),
+                html.Th("缓存时间"),
                 html.Th("操作")
             ]))]
             
@@ -301,9 +366,15 @@ def build_tables(pool_contracts, candidates, interval="1h"):
                     funding_rate = info.get("funding_rate") or info.get("current_funding_rate", 0)
                     funding_time = info.get("funding_time") or info.get("next_funding_time", "")
                     exchange = info.get("exchange", "binance")
+                    volume_24h = info.get("volume_24h", 0)
+                    mark_price = info.get("mark_price", 0)
                     
                     # 格式化时间
                     formatted_time = format_time(funding_time)
+                    
+                    # 格式化成交量和价格
+                    formatted_volume = f"{float(volume_24h):,.0f}" if volume_24h else "未知"
+                    formatted_price = f"${float(mark_price):.4f}" if mark_price else "未知"
                     
                     candidates_table_rows.append(
                         html.Tr([
@@ -311,6 +382,9 @@ def build_tables(pool_contracts, candidates, interval="1h"):
                             html.Td(exchange),
                             html.Td(f"{float(funding_rate)*100:.4f}%"),
                             html.Td(formatted_time),
+                            html.Td(formatted_volume),
+                            html.Td(formatted_price),
+                            html.Td(update_time),
                             html.Td(dbc.Button("查看历史", id={"type": "view-history", "index": symbol}, size="sm", color="info", className="history-btn", title=f"查看{symbol}的历史资金费率")),
                         ])
                     )
@@ -331,7 +405,9 @@ def build_tables(pool_contracts, candidates, interval="1h"):
     except Exception as e:
         error_msg = f"构建表格失败: {str(e)}"
         print(f"❌ 构建表格异常: {error_msg}")
-        return f"构建表格失败: {str(e)}", f"构建表格失败: {str(e)}"
+        # 返回错误信息作为HTML组件，保持返回结构一致
+        error_table = html.P(f"❌ {error_msg}", className="text-danger")
+        return error_table, error_table
 
 # 查看历史资金费率回调
 @app.callback(
@@ -587,6 +663,7 @@ def get_latest_funding_rates(latest_rates_clicks, current_interval):
     Output("pool-contracts-table", "children", allow_duplicate=True),
     Output("candidates-table", "children", allow_duplicate=True),
     Output("contract-count-display", "children", allow_duplicate=True),
+    Output("funding-rate-update-time", "children", allow_duplicate=True),
     Output("notification", "children", allow_duplicate=True),
     Output("notification", "is_open", allow_duplicate=True),
     Input("refresh-candidates-pool-btn", "n_clicks"),
@@ -596,7 +673,7 @@ def get_latest_funding_rates(latest_rates_clicks, current_interval):
 def refresh_candidates_pool(refresh_pool_clicks, current_interval):
     """刷新备选池并更新页面显示"""
     if not refresh_pool_clicks or refresh_pool_clicks <= 0:
-        return dash.no_update, dash.no_update, dash.no_update, "", False
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, "", False
     
     try:
         print("🔄 开始刷新备选池...")
@@ -610,7 +687,7 @@ def refresh_candidates_pool(refresh_pool_clicks, current_interval):
         if refresh_resp.status_code != 200:
             error_msg = f"刷新备选池失败: {refresh_resp.text}"
             print(f"❌ {error_msg}")
-            return dash.no_update, dash.no_update, dash.no_update, error_msg, True
+            return dash.no_update, dash.no_update, dash.no_update, dash.no_update, error_msg, True
         
         print("✅ 备选池刷新成功，开始更新页面显示...")
         
@@ -619,24 +696,26 @@ def refresh_candidates_pool(refresh_pool_clicks, current_interval):
         time.sleep(2)
         
         # 重新加载数据
-        pool_table, candidates_table = load_cached_data(interval)
+        result, update_time = load_cached_data(interval)
+        pool_table, candidates_table = result
         count_text = f"当前显示: {interval}结算周期合约 (已刷新)"
         
         notification_msg = f"✅ 备选池刷新成功！{interval}结算周期合约数据已更新"
         
         print("✅ 页面数据更新完成")
-        return pool_table, candidates_table, count_text, notification_msg, True
+        return pool_table, candidates_table, count_text, update_time, notification_msg, True
         
     except Exception as e:
         error_msg = f"刷新备选池异常: {str(e)}"
         print(f"❌ {error_msg}")
         print(f"❌ 异常详情: {traceback.format_exc()}")
-        return dash.no_update, dash.no_update, dash.no_update, error_msg, True
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, error_msg, True
 
 # 资金费率排序回调函数
 @app.callback(
     Output("candidates-table", "children", allow_duplicate=True),
     Output("contract-count-display", "children", allow_duplicate=True),
+    Output("funding-rate-update-time", "children", allow_duplicate=True),
     [
         Input("sort-funding-rate-asc", "n_clicks"),
         Input("sort-funding-rate-desc", "n_clicks")
@@ -648,7 +727,7 @@ def sort_candidates_by_funding_rate(asc_clicks, desc_clicks, current_interval):
     """根据资金费率排序备选合约"""
     ctx = callback_context
     if not ctx.triggered:
-        return dash.no_update, dash.no_update
+        return dash.no_update, dash.no_update, dash.no_update
     
     try:
         # 确定排序方向
@@ -698,7 +777,9 @@ def sort_candidates_by_funding_rate(asc_clicks, desc_clicks, current_interval):
                         'symbol': symbol,
                         'exchange': exchange,
                         'funding_rate': float(funding_rate),
-                        'funding_time': funding_time
+                        'funding_time': funding_time,
+                        'volume_24h': info.get('volume_24h', 0),
+                        'mark_price': info.get('mark_price', 0)
                     })
                 except (ValueError, TypeError) as e:
                     print(f"⚠️ 处理合约 {symbol} 时出错: {e}")
@@ -754,7 +835,10 @@ def sort_candidates_by_funding_rate(asc_clicks, desc_clicks, current_interval):
                 html.Th("合约名称"), 
                 html.Th("交易所"), 
                 funding_rate_header, 
-                html.Th("上一次结算时间"), 
+                html.Th("上一次结算时间"),
+                html.Th("24小时成交量"),
+                html.Th("标记价格"),
+                html.Th("缓存时间"),
                 html.Th("操作")
             ]))]
             
@@ -764,12 +848,23 @@ def sort_candidates_by_funding_rate(asc_clicks, desc_clicks, current_interval):
                     # 格式化时间
                     formatted_time = format_time(item['funding_time'])
                     
+                    # 获取额外的数据字段
+                    volume_24h = item.get('volume_24h', 0)
+                    mark_price = item.get('mark_price', 0)
+                    
+                    # 格式化成交量和价格
+                    formatted_volume = f"{float(volume_24h):,.0f}" if volume_24h else "未知"
+                    formatted_price = f"${float(mark_price):.4f}" if mark_price else "未知"
+                    
                     candidates_table_rows.append(
                         html.Tr([
                             html.Td(item['symbol']),
                             html.Td(item['exchange']),
                             html.Td(f"{item['funding_rate']*100:.4f}%"),
                             html.Td(formatted_time),
+                            html.Td(formatted_volume),
+                            html.Td(formatted_price),
+                            html.Td(update_time),
                             html.Td(dbc.Button("查看历史", id={"type": "view-history", "index": item['symbol']}, size="sm", color="info", className="history-btn", title=f"查看{item['symbol']}的历史资金费率")),
                         ])
                     )
@@ -783,20 +878,49 @@ def sort_candidates_by_funding_rate(asc_clicks, desc_clicks, current_interval):
             sort_direction = "升序" if sort_asc else "降序"
             count_text = f"当前显示: {interval}结算周期合约 (已按资金费率{sort_direction}排列)"
             
+            # 获取缓存更新时间
+            update_time = "未知"
+            try:
+                cache_file = f"cache/{interval}_funding_contracts_full.json"
+                if os.path.exists(cache_file):
+                    with open(cache_file, 'r', encoding='utf-8') as f:
+                        cache_data = json.load(f)
+                        cache_time = cache_data.get('cache_time', '')
+                        if cache_time:
+                            try:
+                                # 解析缓存时间并格式化为北京时间
+                                if 'T' in cache_time:
+                                    # ISO格式时间
+                                    dt = datetime.fromisoformat(cache_time.replace('Z', '+00:00'))
+                                else:
+                                    # 其他格式，尝试解析
+                                    dt = datetime.strptime(cache_time, '%Y-%m-%d %H:%M:%S')
+                                
+                                # 转换为北京时间
+                                if dt.tzinfo is None:
+                                    dt = dt.replace(tzinfo=timezone.utc)
+                                beijing_time = dt.astimezone(timezone(timedelta(hours=8)))
+                                update_time = beijing_time.strftime('%Y-%m-%d %H:%M:%S')
+                            except Exception as e:
+                                print(f"⚠️ 解析缓存时间失败: {e}")
+                                update_time = cache_time
+            except Exception as e:
+                print(f"⚠️ 获取缓存时间失败: {e}")
+            
             print(f"✅ 备选合约已按资金费率{sort_direction}排列")
-            return sorted_table, count_text
+            return sorted_table, count_text, update_time
             
         except Exception as e:
             error_msg = f"读取缓存文件失败: {str(e)}"
             print(f"❌ {error_msg}")
             print(f"❌ 异常详情: {traceback.format_exc()}")
-            return dash.no_update, f"当前显示: {interval}结算周期合约 (排序失败: {error_msg})"
+            return dash.no_update, f"当前显示: {interval}结算周期合约 (排序失败: {error_msg})", "排序失败"
         
     except Exception as e:
         error_msg = f"排序失败: {str(e)}"
         print(f"❌ 排序异常: {error_msg}")
         print(f"❌ 异常详情: {traceback.format_exc()}")
-        return dash.no_update, f"排序失败: {error_msg}"
+        return dash.no_update, f"排序失败: {error_msg}", "排序失败"
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8050)

@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     CACHE_DURATION: int = 7200             # 缓存有效期（秒，2小时）
     UPDATE_INTERVAL: int = 1800            # 更新间隔（秒，30分钟）
     CONTRACT_REFRESH_INTERVAL: int = 86400  # 合约池刷新间隔（秒，24小时）
-    FUNDING_RATE_CHECK_INTERVAL: int = 300 # 资金费率检查间隔（秒，5分钟）
+    FUNDING_RATE_CHECK_INTERVAL: int = 600 # 资金费率检查间隔（秒，10分钟）
     
     # 交易所配置
     EXCHANGES: List[str] = ["binance", "okx", "bybit"]

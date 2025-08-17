@@ -62,7 +62,8 @@ class FundingRateUtils:
                  f"当前费率: {funding_rate:.4%} ({direction})\n" \
                  f"标记价格: ${mark_price:.4f}\n" \
                  f"下次结算时间: {next_funding_time}\n" \
-                 f"数据来源: {'实时' if data_source == 'real_time' else '缓存'}"
+                 f"数据来源: {'实时' if data_source == 'real_time' else '缓存'}\n" \
+                 f"24h成交量: {info.get('volume_24h', 0):,.0f}"
         
         return message
     

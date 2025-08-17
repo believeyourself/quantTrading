@@ -51,6 +51,25 @@ def start_all():
     # 使用multiprocessing而不是threading来避免信号处理问题
     processes = []
     
+    def signal_handler(signum, frame):
+        """信号处理器"""
+        print(f"\n收到信号 {signum}，正在停止所有服务...")
+        # 终止所有子进程
+        for process in processes:
+            if process.is_alive():
+                print(f"正在停止进程 {process.pid}...")
+                process.terminate()
+                process.join(timeout=5)
+                if process.is_alive():
+                    print(f"强制终止进程 {process.pid}...")
+                    process.kill()
+        print("所有服务已停止")
+        sys.exit(0)
+    
+    # 设置信号处理器
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
     try:
         # 启动API服务
         api_process = multiprocessing.Process(target=start_api)
@@ -77,16 +96,7 @@ def start_all():
             process.join()
             
     except KeyboardInterrupt:
-        print("\n正在停止服务...")
-        # 终止所有子进程
-        for process in processes:
-            if process.is_alive():
-                process.terminate()
-                process.join(timeout=5)
-                if process.is_alive():
-                    process.kill()
-        print("所有服务已停止")
-        sys.exit(0)
+        signal_handler(signal.SIGINT, None)
     except Exception as e:
         print(f"❌ 启动失败: {e}")
         # 清理进程

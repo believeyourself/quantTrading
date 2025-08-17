@@ -53,6 +53,10 @@ class FundingRateMonitor(BaseStrategy):
         self._update_lock = threading.Lock()
         self.funding = BinanceFunding()
         
+        # 添加停止标志和调度器线程
+        self._stop_event = threading.Event()
+        self._scheduler_thread = None
+        
         os.makedirs("cache", exist_ok=True)
         self._load_cache(load_on_startup=True) # 启动时加载缓存
         # 不立即启动更新线程，等待策略启动时再启动
@@ -61,11 +65,35 @@ class FundingRateMonitor(BaseStrategy):
     def _load_cache(self, load_on_startup=True):
         """加载缓存"""
         if load_on_startup and os.path.exists(self.cache_file):
-            with open(self.cache_file, 'r', encoding='utf-8') as f:
-                self.cached_contracts = json.load(f)
-            self.contract_pool = set(self.cached_contracts.keys())
-            self.last_update_time = datetime.now()
-            print(f"📋 从缓存加载了 {len(self.contract_pool)} 个合约")
+            try:
+                with open(self.cache_file, 'r', encoding='utf-8') as f:
+                    self.cached_contracts = json.load(f)
+                
+                # 调试信息：检查缓存内容
+                if self.cached_contracts:
+                    print(f"📋 缓存文件内容: {list(self.cached_contracts.keys())[:5]}...")
+                    # 检查是否包含正确的合约数据
+                    sample_key = list(self.cached_contracts.keys())[0]
+                    if isinstance(self.cached_contracts[sample_key], dict) and 'symbol' in self.cached_contracts[sample_key]:
+                        print(f"✅ 缓存数据结构正确，包含合约信息")
+                    else:
+                        print(f"⚠️ 缓存数据结构异常，可能包含字段名而非合约数据")
+                        print(f"   样本数据: {self.cached_contracts[sample_key]}")
+                        # 清空异常缓存
+                        self.cached_contracts = {}
+                        self.contract_pool = set()
+                        print("🔄 已清空异常缓存数据")
+                        return
+                
+                self.contract_pool = set(self.cached_contracts.keys())
+                self.last_update_time = datetime.now()
+                print(f"📋 从缓存加载了 {len(self.contract_pool)} 个合约")
+                
+            except Exception as e:
+                print(f"❌ 加载缓存失败: {e}")
+                self.cached_contracts = {}
+                self.contract_pool = set()
+                self.last_update_time = None
         else:
             self.cached_contracts = {}
             self.contract_pool = set()
@@ -152,15 +180,43 @@ class FundingRateMonitor(BaseStrategy):
             removed_contracts = self.contract_pool - new_pool
             if removed_contracts:
                 print(f"🔻 出池合约: {', '.join(removed_contracts)}")
-                # 发送出池通知
-                send_telegram_message(f"🔻 出池合约: {', '.join(removed_contracts)}")
+                # 发送出池通知 - 包含合约详细信息
+                for symbol in removed_contracts:
+                    if symbol in self.cached_contracts:
+                        info = self.cached_contracts[symbol]
+                        funding_rate = info.get('current_funding_rate', 0)
+                        mark_price = info.get('mark_price', 0)
+                        volume_24h = info.get('volume_24h', 0)
+                        
+                        message = f"🔻 合约出池: {symbol}\n" \
+                                 f"资金费率: {funding_rate:.4%}\n" \
+                                 f"标记价格: ${mark_price:.4f}\n" \
+                                 f"24h成交量: {volume_24h:,.0f}"
+                        send_telegram_message(message)
+                    else:
+                        # 如果没有详细信息，发送简单通知
+                        send_telegram_message(f"🔻 合约出池: {symbol}")
             
             # 入池合约
             added_contracts = new_pool - self.contract_pool
             if added_contracts:
                 print(f"🔺 入池合约: {', '.join(added_contracts)}")
-                # 发送入池通知
-                send_telegram_message(f"🔺 入池合约: {', '.join(added_contracts)}")
+                # 发送入池通知 - 包含合约详细信息
+                for symbol in added_contracts:
+                    if symbol in selected_contracts:
+                        info = selected_contracts[symbol]
+                        funding_rate = info.get('current_funding_rate', 0)
+                        mark_price = info.get('mark_price', 0)
+                        volume_24h = info.get('volume_24h', 0)
+                        
+                        message = f"🔺 合约入池: {symbol}\n" \
+                                 f"资金费率: {funding_rate:.4%}\n" \
+                                 f"标记价格: ${mark_price:.4f}\n" \
+                                 f"24h成交量: {volume_24h:,.0f}"
+                        send_telegram_message(message)
+                    else:
+                        # 如果没有详细信息，发送简单通知
+                        send_telegram_message(f"🔺 合约入池: {symbol}")
             
             # 更新合约池和缓存
             self.contract_pool = new_pool
@@ -208,7 +264,8 @@ class FundingRateMonitor(BaseStrategy):
                                          f"当前费率: {funding_rate:.4%} ({direction})\n" \
                                          f"标记价格: ${mark_price:.4f}\n" \
                                          f"下次结算时间: {next_funding_time}\n" \
-                                         f"数据来源: {'实时' if data_source == 'real_time' else '缓存'}"
+                                         f"数据来源: {'实时' if data_source == 'real_time' else '缓存'}\n" \
+                                         f"24h成交量: {info.get('volume_24h', 0):,.0f}"
                                 
                                 send_telegram_message(message)
                                 warning_count += 1
@@ -305,8 +362,11 @@ class FundingRateMonitor(BaseStrategy):
         print(f"   - 资金费率检查: 每{self.parameters['funding_rate_check_interval']}秒")
         print("💡 也可通过Web界面或API手动触发操作")
         
-        # 启动调度器
-        self._run_scheduler()
+        # 启动调度器线程
+        self._stop_event.clear()  # 清除停止标志
+        self._scheduler_thread = threading.Thread(target=self._run_scheduler, daemon=True)
+        self._scheduler_thread.start()
+        print("✅ 调度器线程已启动")
     
     def start_monitoring_manual(self):
         """初始化监控（手动模式，不启动定时任务）"""
@@ -337,16 +397,19 @@ class FundingRateMonitor(BaseStrategy):
     def _run_scheduler(self):
         """运行调度器"""
         print("🔄 调度器已启动，开始执行定时任务...")
-        while True:
+        while not self._stop_event.is_set():
             try:
                 schedule.run_pending()
-                time.sleep(1)
-            except KeyboardInterrupt:
-                print("🛑 调度器被用户中断")
-                break
+                # 使用更短的睡眠时间，以便更快响应停止信号
+                if self._stop_event.wait(timeout=1):
+                    break
             except Exception as e:
                 print(f"❌ 调度器异常: {e}")
-                time.sleep(5)  # 异常时等待5秒再继续
+                # 检查停止信号，如果被设置则退出
+                if self._stop_event.wait(timeout=5):
+                    break
+        
+        print("🛑 调度器已停止")
     
     def get_current_pool(self):
         """获取当前合约池"""
@@ -355,6 +418,19 @@ class FundingRateMonitor(BaseStrategy):
     def stop_monitoring(self):
         """停止监控系统"""
         print("🛑 停止资金费率监控系统...")
+        
+        # 设置停止标志
+        self._stop_event.set()
+        print("✅ 停止标志已设置")
+        
+        # 等待调度器线程结束
+        if self._scheduler_thread and self._scheduler_thread.is_alive():
+            print("🔄 等待调度器线程结束...")
+            self._scheduler_thread.join(timeout=10)  # 最多等待10秒
+            if self._scheduler_thread.is_alive():
+                print("⚠️ 调度器线程未能在10秒内结束，强制终止")
+            else:
+                print("✅ 调度器线程已正常结束")
         
         # 清除所有定时任务
         schedule.clear()
