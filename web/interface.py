@@ -324,28 +324,51 @@ def build_tables(pool_contracts, candidates, interval="1h"):
     [
         Input({"type": "view-history", "index": dash.ALL}, "n_clicks")
     ],
-    [State("history-rate-modal", "is_open")]
+    [State("history-rate-modal", "is_open")],
+    prevent_initial_call=True
 )
-
 def open_history_modal(n_clicks, is_open):
     ctx = callback_context
+    print(f"🔍 查看历史回调被触发")
+    print(f"   n_clicks: {n_clicks}")
+    print(f"   is_open: {is_open}")
+    print(f"   ctx.triggered: {ctx.triggered}")
+    
     if not ctx.triggered:
+        print("   ⚠️ 没有触发上下文")
         return False, "", {}, ""
 
     triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    print(f"   triggered_id: {triggered_id}")
     
     # 检查是否真的是历史按钮被点击
-    if not triggered_id.startswith('{"type":"view-history"'):
+    # 按钮ID可能是 {"index":"SYMBOL","type":"view-history"} 或 {"type":"view-history","index":"SYMBOL"}
+    if not ('"type":"view-history"' in triggered_id and '"index":' in triggered_id):
+        print(f"   ❌ 不是历史按钮的触发: {triggered_id}")
         return False, "", {}, ""
     
+    print(f"   ✅ 确认是历史按钮触发")
+    
     try:
-        symbol = json.loads(triggered_id)['index']
+        # 解析symbol - 支持两种ID格式
+        parsed_id = json.loads(triggered_id)
+        symbol = parsed_id.get('index') or parsed_id.get('symbol')
+        if not symbol:
+            print(f"   ❌ 无法从ID中解析symbol: {triggered_id}")
+            return False, "", {}, ""
+        print(f"🔄 查看历史按钮被点击，合约: {symbol}")
+        
+        # 调用API获取历史数据
         resp = requests.get(f"{API_BASE_URL}/funding_rates?symbol={symbol}")
         if resp.status_code != 200:
-            return not is_open, f"{symbol} 历史资金费率", {}, "无法获取历史数据"
+            error_msg = f"无法获取历史数据: {resp.text}"
+            print(f"❌ {error_msg}")
+            return not is_open, f"{symbol} 历史资金费率", {}, error_msg
 
         data = resp.json()
         funding_rates = data.get("funding_rate", [])
+        
+        print(f"📊 获取到 {len(funding_rates)} 条历史记录")
 
         if not funding_rates:
             return not is_open, f"{symbol} 历史资金费率", {}, "暂无历史数据"
@@ -376,14 +399,19 @@ def open_history_modal(n_clicks, is_open):
             table_rows.append(
                 html.Tr([
                     html.Td(item.get("funding_time")),
-                    html.Td(f"{item.get("funding_rate")*100:.4f}%")
+                    html.Td(f"{item.get('funding_rate')*100:.4f}%")
                 ])
             )
         table = dbc.Table(table_header + [html.Tbody(table_rows)], bordered=True, hover=True)
 
+        print(f"✅ 历史数据准备完成，图表数据: {len(dates)} 点，表格行数: {len(table_rows)}")
         return not is_open, f"{symbol} 历史资金费率", figure, table
+        
     except Exception as e:
-        return not is_open, "错误", {}, f"获取数据异常: {str(e)}"
+        error_msg = f"获取数据异常: {str(e)}"
+        print(f"❌ 查看历史异常: {error_msg}")
+        print(f"❌ 异常详情: {traceback.format_exc()}")
+        return not is_open, "错误", {}, error_msg
 
 # 获取最新资金费率回调
 @app.callback(
