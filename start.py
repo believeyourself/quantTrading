@@ -45,6 +45,7 @@ def start_all():
     print("🚀 启动所有服务...")
     print("API服务: http://localhost:8000")
     print("Web界面: http://localhost:8050")
+    print("主程序: 监控系统（包含定时任务）")
     print("按 Ctrl+C 停止所有服务")
     
     # 使用multiprocessing而不是threading来避免信号处理问题
@@ -57,6 +58,13 @@ def start_all():
         processes.append(api_process)
         print("✅ API服务已启动")
         time.sleep(3)  # 等待API服务启动
+        
+        # 启动主程序（监控系统，包含定时任务）
+        main_process = multiprocessing.Process(target=start_main)
+        main_process.start()
+        processes.append(main_process)
+        print("✅ 主程序已启动（包含定时任务）")
+        time.sleep(2)  # 等待主程序启动
         
         # 启动Web界面
         web_process = multiprocessing.Process(target=start_web)
@@ -99,7 +107,7 @@ def show_menu():
     print("1. 🌐 Web界面 (端口8050)")
     print("2. 🔌 API服务 (端口8000)")
     print("3. 🚀 主程序 (监控系统)")
-    print("4. 🎯 全部启动 (Web + API)")
+    print("4. 🎯 全部启动 (Web + API + 主程序)")
     print("5. ❌ 退出")
     print("=" * 60)
 
@@ -121,7 +129,11 @@ def main():
             start_all()
         else:
             print(f"未知模式: {mode}")
-            print("支持的模式: web, api, main, all")
+            print("支持的模式:")
+            print("  web, w  - Web界面")
+            print("  api, a  - API服务")
+            print("  main, m - 主程序（监控系统）")
+            print("  all     - 全部启动（Web + API + 主程序）")
             sys.exit(1)
     else:
         # 交互式菜单模式

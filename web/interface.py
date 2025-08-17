@@ -122,7 +122,7 @@ app.layout = dbc.Container([
                         dbc.ModalBody([
                             dcc.Graph(id="history-rate-graph"),
                             html.Hr(),
-                            html.H5("历史资金费率表格数据"),
+                            html.H5("历史资金费率与价格表格数据"),
                             html.Div(id="history-rate-table")
                         ]),
                     ], id="history-rate-modal", is_open=False, size="xl"),
@@ -196,6 +196,7 @@ def update_candidates_data(refresh_clicks, current_interval):
         count_text = f"当前显示: {interval}结算周期合约"
         
         print("✅ 本地缓存数据刷新完成")
+        print("🔄 表格数据已刷新，历史按钮功能正常")
         return pool_table, candidates_table, count_text
         
     except Exception as e:
@@ -275,7 +276,24 @@ def build_tables(pool_contracts, candidates, interval="1h"):
         # 构建所有备选合约表格
         if candidates and len(candidates) > 0:
             print(f"🔧 构建备选合约表格，共 {len(candidates)} 个合约")
-            candidates_table_header = [html.Thead(html.Tr([html.Th("合约名称"), html.Th("交易所"), html.Th("当前资金费率"), html.Th("上一次结算时间"), html.Th("操作")]))]
+            
+            # 创建可排序的资金费率列标题
+            funding_rate_header = html.Th([
+                html.Span("当前资金费率", className="me-2"),
+                html.Div([
+                    dbc.Button("↑", id="sort-funding-rate-asc", size="sm", color="outline-primary", className="me-1", title="按资金费率升序排列"),
+                    dbc.Button("↓", id="sort-funding-rate-desc", size="sm", color="outline-primary", title="按资金费率降序排列")
+                ], className="d-inline")
+            ])
+            
+            candidates_table_header = [html.Thead(html.Tr([
+                html.Th("合约名称"), 
+                html.Th("交易所"), 
+                funding_rate_header, 
+                html.Th("上一次结算时间"), 
+                html.Th("操作")
+            ]))]
+            
             candidates_table_rows = []
             for symbol, info in candidates.items():
                 try:
@@ -293,7 +311,7 @@ def build_tables(pool_contracts, candidates, interval="1h"):
                             html.Td(exchange),
                             html.Td(f"{float(funding_rate)*100:.4f}%"),
                             html.Td(formatted_time),
-                            html.Td(dbc.Button("查看历史", id={"type": "view-history", "index": symbol}, size="sm", color="info")),
+                            html.Td(dbc.Button("查看历史", id={"type": "view-history", "index": symbol}, size="sm", color="info", className="history-btn", title=f"查看{symbol}的历史资金费率")),
                         ])
                     )
                 except Exception as e:
@@ -347,7 +365,25 @@ def open_history_modal(n_clicks, is_open):
         print(f"   ❌ 不是历史按钮的触发: {triggered_id}")
         return False, "", {}, ""
     
+    # 检查是否有实际的点击事件
+    if not any(n_clicks):
+        print(f"   ❌ 没有检测到点击事件")
+        return False, "", {}, ""
+    
+    # 找到被点击的按钮索引
+    clicked_index = None
+    for i, clicks in enumerate(n_clicks):
+        if clicks and clicks > 0:
+            clicked_index = i
+            break
+    
+    if clicked_index is None:
+        print(f"   ❌ 无法确定哪个按钮被点击")
+        return False, "", {}, ""
+    
     print(f"   ✅ 确认是历史按钮触发")
+    print(f"   🔄 按钮ID: {triggered_id}")
+    print(f"   🔄 点击的按钮索引: {clicked_index}")
     
     try:
         # 解析symbol - 支持两种ID格式
@@ -373,39 +409,74 @@ def open_history_modal(n_clicks, is_open):
         if not funding_rates:
             return not is_open, f"{symbol} 历史资金费率", {}, "暂无历史数据"
 
-        # 准备图表数据
+        # 准备图表数据 - 双Y轴显示资金费率和价格
         dates = [item.get("funding_time") for item in funding_rates]
         rates = [item.get("funding_rate") * 100 for item in funding_rates]
+        prices = [item.get("mark_price", 0) for item in funding_rates]
 
         figure = {
-            'data': [{
-                'x': dates,
-                'y': rates,
-                'type': 'line',
-                'name': '资金费率(%)'
-            }],
+            'data': [
+                {
+                    'x': dates,
+                    'y': rates,
+                    'type': 'line',
+                    'name': '资金费率(%)',
+                    'yaxis': 'y',
+                    'line': {'color': 'blue'}
+                },
+                {
+                    'x': dates,
+                    'y': prices,
+                    'type': 'line',
+                    'name': '标记价格($)',
+                    'yaxis': 'y2',
+                    'line': {'color': 'red'}
+                }
+            ],
             'layout': {
-                'title': f'{symbol} 历史资金费率',
+                'title': f'{symbol} 历史资金费率与价格',
                 'xaxis': {'title': '时间'},
-                'yaxis': {'title': '资金费率(%)'},
-                'hovermode': 'closest'
+                'yaxis': {
+                    'title': '资金费率(%)',
+                    'side': 'left',
+                    'color': 'blue'
+                },
+                'yaxis2': {
+                    'title': '标记价格($)',
+                    'side': 'right',
+                    'overlaying': 'y',
+                    'color': 'red'
+                },
+                'hovermode': 'closest',
+                'legend': {'x': 0.1, 'y': 0.9}
             }
         }
 
-        # 准备表格数据
-        table_header = [html.Thead(html.Tr([html.Th("时间"), html.Th("资金费率(%)")]))]
+        # 准备表格数据 - 添加价格列
+        table_header = [html.Thead(html.Tr([
+            html.Th("时间"), 
+            html.Th("资金费率(%)"), 
+            html.Th("标记价格($)")
+        ]))]
         table_rows = []
         for item in funding_rates:
+            funding_rate = item.get('funding_rate', 0)
+            mark_price = item.get('mark_price', 0)
+            
+            # 根据资金费率设置颜色
+            rate_color = "success" if abs(funding_rate) >= 0.01 else "secondary"  # 1%阈值
+            
             table_rows.append(
                 html.Tr([
                     html.Td(item.get("funding_time")),
-                    html.Td(f"{item.get('funding_rate')*100:.4f}%")
+                    html.Td(dbc.Badge(f"{funding_rate*100:.4f}%", color=rate_color)),
+                    html.Td(f"${mark_price:.4f}" if mark_price else "未知")
                 ])
             )
         table = dbc.Table(table_header + [html.Tbody(table_rows)], bordered=True, hover=True)
 
         print(f"✅ 历史数据准备完成，图表数据: {len(dates)} 点，表格行数: {len(table_rows)}")
-        return not is_open, f"{symbol} 历史资金费率", figure, table
+        return not is_open, f"{symbol} 历史资金费率与价格", figure, table
         
     except Exception as e:
         error_msg = f"获取数据异常: {str(e)}"
@@ -415,7 +486,6 @@ def open_history_modal(n_clicks, is_open):
 
 # 获取最新资金费率回调
 @app.callback(
-    Output("candidates-table", "children", allow_duplicate=True),
     Output("notification", "children", allow_duplicate=True),
     Output("notification", "is_open", allow_duplicate=True),
     Input("get-latest-rates-btn", "n_clicks"),
@@ -423,8 +493,9 @@ def open_history_modal(n_clicks, is_open):
     prevent_initial_call=True
 )
 def get_latest_funding_rates(latest_rates_clicks, current_interval):
+    """获取最新资金费率并更新缓存，但不改变页面展示内容"""
     if not latest_rates_clicks or latest_rates_clicks <= 0:
-        return dash.no_update, "", False
+        return "", False
     
     # 使用当前选中的结算周期，如果没有选中则默认使用1h
     interval = current_interval if current_interval else "1h"
@@ -437,11 +508,11 @@ def get_latest_funding_rates(latest_rates_clicks, current_interval):
         if latest_resp.status_code != 200:
             error_msg = f"获取最新资金费率失败: {latest_resp.text}"
             print(f"❌ Web界面: {error_msg}")
-            return dash.no_update, error_msg, True
+            return error_msg, True
         
         print(f"✅ Web界面: API调用成功，缓存已更新")
         
-        # 直接从缓存文件读取数据
+        # 直接从缓存文件读取数据以获取统计信息
         cache_file = "cache/latest_funding_rates.json"
         if os.path.exists(cache_file):
             try:
@@ -487,105 +558,29 @@ def get_latest_funding_rates(latest_rates_clicks, current_interval):
                     print(f"❌ Web界面: 资金费率检查失败: {e}")
                     warning_count = 0
                 
-                if latest_contracts:
-                    # 根据当前选中的结算周期过滤合约
-                    filtered_contracts = {}
-                    for symbol, info in latest_contracts.items():
-                        # 检查合约的结算周期是否匹配当前选中的值
-                        contract_interval = info.get('funding_interval', '1h')
-                        # 将小时数转换为对应的标签格式
-                        if isinstance(contract_interval, (int, float)):
-                            if abs(contract_interval - 1.0) < 0.1:
-                                contract_interval = "1h"
-                            elif abs(contract_interval - 2.0) < 0.1:
-                                contract_interval = "2h"
-                            elif abs(contract_interval - 4.0) < 0.1:
-                                contract_interval = "4h"
-                            elif abs(contract_interval - 8.0) < 0.1:
-                                contract_interval = "8h"
-                            else:
-                                contract_interval = "1h"  # 默认
-                        
-                        if contract_interval == interval:
-                            filtered_contracts[symbol] = info
-                    
-                    if not filtered_contracts:
-                        return html.P(f"暂无{interval}结算周期的合约数据"), f"⚠️ 暂无{interval}结算周期的合约数据", True
-                    
-                    # 构建最新资金费率表格
-                    candidates_table_header = [html.Thead(html.Tr([
-                        html.Th("合约名称"), 
-                        html.Th("交易所"), 
-                        html.Th("最新资金费率"), 
-                        html.Th("下次结算时间"), 
-                        html.Th("标记价格"),
-                        html.Th("数据状态")
-                    ]))]
-                    
-                    candidates_table_rows = []
-                    
-                    for symbol, info in filtered_contracts.items():
-                        funding_rate = info.get('funding_rate', 0)
-                        next_time = info.get('next_funding_time')
-                        data_source = info.get('data_source', 'unknown')
-                        
-                        if next_time:
-                            try:
-                                next_time_dt = datetime.fromtimestamp(int(next_time) / 1000)
-                                next_time_str = next_time_dt.strftime('%Y-%m-%d %H:%M:%S')
-                            except:
-                                next_time_str = str(next_time)
-                        else:
-                            next_time_str = "未知"
-                        
-                        # 根据资金费率设置颜色
-                        rate_color = "success" if abs(funding_rate) >= threshold else "secondary"
-                        rate_text = f"{funding_rate*100:.4f}%"
-                        
-                        # 数据状态指示
-                        if data_source == "real_time":
-                            status_badge = dbc.Badge("实时", color="success", className="ms-1")
-                        else:
-                            status_badge = dbc.Badge("缓存", color="warning", className="ms-1")
-                        
-                        candidates_table_rows.append(
-                            html.Tr([
-                                html.Td(symbol),
-                                html.Td(info.get("exchange", "")),
-                                html.Td(dbc.Badge(rate_text, color=rate_color)),
-                                html.Td(next_time_str),
-                                html.Td(f"${info.get('mark_price', 0):.4f}"),
-                                html.Td(status_badge)
-                            ])
-                        )
-                    
-                    candidates_table = dbc.Table(candidates_table_header + [html.Tbody(candidates_table_rows)], bordered=True, hover=True)
-                    
-                    # 统计信息
-                    notification_msg = f"✅ 成功获取 {len(filtered_contracts)} 个{interval}结算周期合约的最新资金费率数据 (实时: {real_time_count}, 缓存: {cached_count}) | 缓存时间: {cache_time}"
-                    if warning_count > 0:
-                        notification_msg += f" | 📢 发现 {warning_count} 个高资金费率合约，已发送通知"
-                    
-                    print(f"📊 Web界面: 表格构建完成，{interval}结算周期合约: {len(filtered_contracts)}, 实时数据: {real_time_count}, 缓存数据: {cached_count}")
-                    
-                    return candidates_table, notification_msg, True
-                else:
-                    print("⚠️ Web界面: 缓存文件中没有合约数据")
-                    return html.P("暂无最新资金费率数据"), "⚠️ 缓存文件中没有合约数据", True
-                    
+                # 构建通知消息（不改变页面展示内容）
+                notification_msg = f"✅ 缓存已更新！成功获取 {len(latest_contracts)} 个合约的最新资金费率数据 (实时: {real_time_count}, 缓存: {cached_count}) | 缓存时间: {cache_time}"
+                if warning_count > 0:
+                    notification_msg += f" | 📢 发现 {warning_count} 个高资金费率合约，已发送通知"
+                
+                print(f"📊 Web界面: 缓存更新完成，共 {len(latest_contracts)} 个合约，实时数据: {real_time_count}, 缓存数据: {cached_count}")
+                
+                # 只返回通知消息，不改变表格内容
+                return notification_msg, True
+                
             except Exception as e:
                 error_msg = f"读取缓存文件失败: {str(e)}"
                 print(f"❌ Web界面: {error_msg}")
-                return dash.no_update, error_msg, True
+                return error_msg, True
         else:
             print("⚠️ Web界面: 缓存文件不存在")
-            return html.P("缓存文件不存在"), "⚠️ 缓存文件不存在", True
+            return "⚠️ 缓存文件不存在", True
             
     except Exception as e:
         error_msg = f"❌ 获取最新资金费率异常: {str(e)}"
         print(f"❌ Web界面: {error_msg}")
         print(f"❌ Web界面: 异常详情: {traceback.format_exc()}")
-        return dash.no_update, error_msg, True
+        return error_msg, True
 
 # 刷新备选池回调 - 刷新数据并更新页面显示
 @app.callback(
@@ -637,6 +632,171 @@ def refresh_candidates_pool(refresh_pool_clicks, current_interval):
         print(f"❌ {error_msg}")
         print(f"❌ 异常详情: {traceback.format_exc()}")
         return dash.no_update, dash.no_update, dash.no_update, error_msg, True
+
+# 资金费率排序回调函数
+@app.callback(
+    Output("candidates-table", "children", allow_duplicate=True),
+    Output("contract-count-display", "children", allow_duplicate=True),
+    [
+        Input("sort-funding-rate-asc", "n_clicks"),
+        Input("sort-funding-rate-desc", "n_clicks")
+    ],
+    [State("interval-filter", "value")],
+    prevent_initial_call=True
+)
+def sort_candidates_by_funding_rate(asc_clicks, desc_clicks, current_interval):
+    """根据资金费率排序备选合约"""
+    ctx = callback_context
+    if not ctx.triggered:
+        return dash.no_update, dash.no_update
+    
+    try:
+        # 确定排序方向
+        sort_asc = False
+        if ctx.triggered[0]['prop_id'] == 'sort-funding-rate-asc.n_clicks':
+            sort_asc = True
+            print("🔄 按资金费率升序排列")
+        elif ctx.triggered[0]['prop_id'] == 'sort-funding-rate-desc.n_clicks':
+            sort_asc = False
+            print("🔄 按资金费率降序排列")
+        else:
+            return dash.no_update, dash.no_update
+        
+        # 使用当前选中的结算周期
+        interval = current_interval if current_interval else "1h"
+        print(f"🔄 排序结算周期: {interval}")
+        
+        # 直接从缓存文件读取原始数据
+        try:
+            cache_file = f"cache/{interval}_funding_contracts_full.json"
+            if not os.path.exists(cache_file):
+                error_msg = f"缓存文件不存在: {cache_file}"
+                print(f"❌ {error_msg}")
+                return dash.no_update, f"当前显示: {interval}结算周期合约 (排序失败: {error_msg})"
+            
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                cache_data = json.load(f)
+                candidates = cache_data.get('contracts', {})
+            
+            if not candidates:
+                error_msg = "没有合约数据可排序"
+                print(f"❌ {error_msg}")
+                return dash.no_update, f"当前显示: {interval}结算周期合约 (排序失败: {error_msg})"
+            
+            print(f"📊 从缓存读取到 {len(candidates)} 个合约数据")
+            
+            # 将字典转换为列表并排序
+            candidates_list = []
+            for symbol, info in candidates.items():
+                try:
+                    # 兼容不同的字段名
+                    funding_rate = info.get("funding_rate") or info.get("current_funding_rate", 0)
+                    funding_time = info.get("funding_time") or info.get("next_funding_time", "")
+                    exchange = info.get("exchange", "binance")
+                    
+                    candidates_list.append({
+                        'symbol': symbol,
+                        'exchange': exchange,
+                        'funding_rate': float(funding_rate),
+                        'funding_time': funding_time
+                    })
+                except (ValueError, TypeError) as e:
+                    print(f"⚠️ 处理合约 {symbol} 时出错: {e}")
+                    continue
+            
+            # 按资金费率排序
+            candidates_list.sort(key=lambda x: x['funding_rate'], reverse=not sort_asc)
+            
+            print(f"✅ 排序完成，共 {len(candidates_list)} 个合约")
+            
+            # 重新构建表格
+            def format_time(timestamp):
+                """格式化时间戳为北京时间"""
+                try:
+                    if not timestamp:
+                        return "未知"
+                    
+                    # 如果是字符串，尝试转换为数字
+                    if isinstance(timestamp, str):
+                        if timestamp.isdigit():
+                            timestamp = int(timestamp)
+                        else:
+                            return timestamp  # 如果已经是格式化的时间字符串，直接返回
+                    
+                    # 如果是数字时间戳
+                    if isinstance(timestamp, (int, float)):
+                        # 判断是秒还是毫秒时间戳
+                        if timestamp > 1e10:  # 毫秒时间戳
+                            timestamp = timestamp / 1000
+                        
+                        # 转换为北京时间（UTC+8）
+                        utc_time = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+                        beijing_time = utc_time + timedelta(hours=8)
+                        
+                        # 格式化为常见时间格式
+                        return beijing_time.strftime('%Y-%m-%d %H:%M:%S')
+                    
+                    return str(timestamp)
+                except Exception as e:
+                    print(f"⚠️ 时间格式化失败 {timestamp}: {e}")
+                    return str(timestamp)
+            
+            # 创建可排序的资金费率列标题
+            funding_rate_header = html.Th([
+                html.Span("当前资金费率", className="me-2"),
+                html.Div([
+                    dbc.Button("↑", id="sort-funding-rate-asc", size="sm", color="outline-primary", className="me-1", title="按资金费率升序排列"),
+                    dbc.Button("↓", id="sort-funding-rate-desc", size="sm", color="outline-primary", title="按资金费率降序排列")
+                ], className="d-inline")
+            ])
+            
+            candidates_table_header = [html.Thead(html.Tr([
+                html.Th("合约名称"), 
+                html.Th("交易所"), 
+                funding_rate_header, 
+                html.Th("上一次结算时间"), 
+                html.Th("操作")
+            ]))]
+            
+            candidates_table_rows = []
+            for item in candidates_list:
+                try:
+                    # 格式化时间
+                    formatted_time = format_time(item['funding_time'])
+                    
+                    candidates_table_rows.append(
+                        html.Tr([
+                            html.Td(item['symbol']),
+                            html.Td(item['exchange']),
+                            html.Td(f"{item['funding_rate']*100:.4f}%"),
+                            html.Td(formatted_time),
+                            html.Td(dbc.Button("查看历史", id={"type": "view-history", "index": item['symbol']}, size="sm", color="info", className="history-btn", title=f"查看{item['symbol']}的历史资金费率")),
+                        ])
+                    )
+                except Exception as e:
+                    print(f"⚠️ 处理排序后合约 {item['symbol']} 时出错: {e}")
+                    continue
+            
+            # 构建排序后的表格
+            sorted_table = dbc.Table(candidates_table_header + [html.Tbody(candidates_table_rows)], bordered=True, hover=True)
+            
+            sort_direction = "升序" if sort_asc else "降序"
+            count_text = f"当前显示: {interval}结算周期合约 (已按资金费率{sort_direction}排列)"
+            
+            print(f"✅ 备选合约已按资金费率{sort_direction}排列")
+            return sorted_table, count_text
+            
+        except Exception as e:
+            error_msg = f"读取缓存文件失败: {str(e)}"
+            print(f"❌ {error_msg}")
+            print(f"❌ 异常详情: {traceback.format_exc()}")
+            return dash.no_update, f"当前显示: {interval}结算周期合约 (排序失败: {error_msg})"
+        
+    except Exception as e:
+        error_msg = f"排序失败: {str(e)}"
+        print(f"❌ 排序异常: {error_msg}")
+        print(f"❌ 异常详情: {traceback.format_exc()}")
+        return dash.no_update, f"排序失败: {error_msg}"
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8050)
