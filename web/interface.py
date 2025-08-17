@@ -181,13 +181,14 @@ def filter_by_interval(interval):
     Output("candidates-table", "children", allow_duplicate=True),
     Output("contract-count-display", "children", allow_duplicate=True),
     Input("refresh-candidates-btn", "n_clicks"),
+    State("interval-filter", "value"),  # 获取当前选中的结算周期
     prevent_initial_call=True
 )
-def update_candidates_data(refresh_clicks):
+def update_candidates_data(refresh_clicks, current_interval):
     """刷新时重新加载本地缓存数据"""
     try:
-        # 默认使用1h结算周期，或者可以从当前选中的值获取
-        interval = "1h"  # 这里可以改为从当前选中的值获取
+        # 使用当前选中的结算周期，如果没有选中则默认使用1h
+        interval = current_interval if current_interval else "1h"
         print(f"🔄 刷新按钮点击 - 重新加载本地缓存数据，结算周期: {interval}")
         
         # 直接调用load_cached_data函数，它会读取本地缓存
@@ -390,14 +391,18 @@ def open_history_modal(n_clicks, is_open):
     Output("notification", "children", allow_duplicate=True),
     Output("notification", "is_open", allow_duplicate=True),
     Input("get-latest-rates-btn", "n_clicks"),
+    State("interval-filter", "value"),  # 获取当前选中的结算周期
     prevent_initial_call=True
 )
-def get_latest_funding_rates(latest_rates_clicks):
+def get_latest_funding_rates(latest_rates_clicks, current_interval):
     if not latest_rates_clicks or latest_rates_clicks <= 0:
         return dash.no_update, "", False
     
+    # 使用当前选中的结算周期，如果没有选中则默认使用1h
+    interval = current_interval if current_interval else "1h"
+    
     try:
-        print("🔄 Web界面: 开始获取最新资金费率...")
+        print(f"🔄 Web界面: 开始获取最新资金费率，结算周期: {interval}...")
         
         # 调用获取最新资金费率的API（这会更新缓存）
         latest_resp = requests.get(f"{API_BASE_URL}/funding_monitor/latest-rates")
@@ -455,6 +460,30 @@ def get_latest_funding_rates(latest_rates_clicks):
                     warning_count = 0
                 
                 if latest_contracts:
+                    # 根据当前选中的结算周期过滤合约
+                    filtered_contracts = {}
+                    for symbol, info in latest_contracts.items():
+                        # 检查合约的结算周期是否匹配当前选中的值
+                        contract_interval = info.get('funding_interval', '1h')
+                        # 将小时数转换为对应的标签格式
+                        if isinstance(contract_interval, (int, float)):
+                            if abs(contract_interval - 1.0) < 0.1:
+                                contract_interval = "1h"
+                            elif abs(contract_interval - 2.0) < 0.1:
+                                contract_interval = "2h"
+                            elif abs(contract_interval - 4.0) < 0.1:
+                                contract_interval = "4h"
+                            elif abs(contract_interval - 8.0) < 0.1:
+                                contract_interval = "8h"
+                            else:
+                                contract_interval = "1h"  # 默认
+                        
+                        if contract_interval == interval:
+                            filtered_contracts[symbol] = info
+                    
+                    if not filtered_contracts:
+                        return html.P(f"暂无{interval}结算周期的合约数据"), f"⚠️ 暂无{interval}结算周期的合约数据", True
+                    
                     # 构建最新资金费率表格
                     candidates_table_header = [html.Thead(html.Tr([
                         html.Th("合约名称"), 
@@ -467,7 +496,7 @@ def get_latest_funding_rates(latest_rates_clicks):
                     
                     candidates_table_rows = []
                     
-                    for symbol, info in latest_contracts.items():
+                    for symbol, info in filtered_contracts.items():
                         funding_rate = info.get('funding_rate', 0)
                         next_time = info.get('next_funding_time')
                         data_source = info.get('data_source', 'unknown')
@@ -505,11 +534,11 @@ def get_latest_funding_rates(latest_rates_clicks):
                     candidates_table = dbc.Table(candidates_table_header + [html.Tbody(candidates_table_rows)], bordered=True, hover=True)
                     
                     # 统计信息
-                    notification_msg = f"✅ 成功获取 {len(latest_contracts)} 个合约的最新资金费率数据 (实时: {real_time_count}, 缓存: {cached_count}) | 缓存时间: {cache_time}"
+                    notification_msg = f"✅ 成功获取 {len(filtered_contracts)} 个{interval}结算周期合约的最新资金费率数据 (实时: {real_time_count}, 缓存: {cached_count}) | 缓存时间: {cache_time}"
                     if warning_count > 0:
                         notification_msg += f" | 📢 发现 {warning_count} 个高资金费率合约，已发送通知"
                     
-                    print(f"📊 Web界面: 表格构建完成，实时数据: {real_time_count}, 缓存数据: {cached_count}")
+                    print(f"📊 Web界面: 表格构建完成，{interval}结算周期合约: {len(filtered_contracts)}, 实时数据: {real_time_count}, 缓存数据: {cached_count}")
                     
                     return candidates_table, notification_msg, True
                 else:
