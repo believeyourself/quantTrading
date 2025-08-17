@@ -397,74 +397,137 @@ def get_latest_funding_rates(latest_rates_clicks):
         return dash.no_update, "", False
     
     try:
-        # 调用获取最新资金费率的API
+        print("🔄 Web界面: 开始获取最新资金费率...")
+        
+        # 调用获取最新资金费率的API（这会更新缓存）
         latest_resp = requests.get(f"{API_BASE_URL}/funding_monitor/latest-rates")
         if latest_resp.status_code != 200:
-            return dash.no_update, f"获取最新资金费率失败: {latest_resp.text}", True
+            error_msg = f"获取最新资金费率失败: {latest_resp.text}"
+            print(f"❌ Web界面: {error_msg}")
+            return dash.no_update, error_msg, True
         
-        latest_data = latest_resp.json()
-        latest_contracts = latest_data.get("contracts", {})
+        print(f"✅ Web界面: API调用成功，缓存已更新")
         
-        if latest_contracts:
-            # 构建最新资金费率表格
-            candidates_table_header = [html.Thead(html.Tr([
-                html.Th("合约名称"), 
-                html.Th("交易所"), 
-                html.Th("最新资金费率"), 
-                html.Th("下次结算时间"), 
-                html.Th("标记价格"),
-                html.Th("数据状态")
-            ]))]
-            
-            candidates_table_rows = []
-            for symbol, info in latest_contracts.items():
-                funding_rate = info.get("funding_rate", 0)
-                next_time = info.get("next_funding_time")
-                if next_time:
-                    try:
-                        next_time_dt = datetime.datetime.fromtimestamp(int(next_time) / 1000)
-                        next_time_str = next_time_dt.strftime('%Y-%m-%d %H:%M:%S')
-                    except:
-                        next_time_str = str(next_time)
+        # 直接从缓存文件读取数据
+        cache_file = "cache/latest_funding_rates.json"
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    cache_data = json.load(f)
+                
+                latest_contracts = cache_data.get('contracts', {})
+                real_time_count = cache_data.get('real_time_count', 0)
+                cached_count = cache_data.get('cached_count', 0)
+                cache_time = cache_data.get('cache_time', '')
+                
+                print(f"📋 Web界面: 从缓存读取到 {len(latest_contracts)} 个合约数据")
+                print(f"📊 Web界面: 实时数据: {real_time_count}, 缓存数据: {cached_count}")
+                
+                # 检查资金费率并发送通知（统一通知逻辑）
+                try:
+                    from utils.funding_rate_utils import FundingRateUtils
+                    from config.settings import settings
+                    
+                    # 从settings.py获取阈值配置
+                    threshold = settings.FUNDING_RATE_THRESHOLD
+                    
+                    # 使用工具类检查资金费率
+                    warning_count, messages = FundingRateUtils.check_funding_rates(
+                        latest_contracts, 
+                        threshold, 
+                        "Web界面"
+                    )
+                    
+                    # 输出所有消息
+                    for msg in messages:
+                        print(f"    {msg}")
+                    
+                    if warning_count > 0:
+                        print(f"📢 Web界面: 发送了 {warning_count} 个资金费率警告通知")
+                    else:
+                        print(f"✅ Web界面: 所有合约资金费率都在正常范围内")
+                        
+                except ImportError:
+                    print("⚠️ Web界面: 无法导入工具类，跳过资金费率检查")
+                    warning_count = 0
+                except Exception as e:
+                    print(f"❌ Web界面: 资金费率检查失败: {e}")
+                    warning_count = 0
+                
+                if latest_contracts:
+                    # 构建最新资金费率表格
+                    candidates_table_header = [html.Thead(html.Tr([
+                        html.Th("合约名称"), 
+                        html.Th("交易所"), 
+                        html.Th("最新资金费率"), 
+                        html.Th("下次结算时间"), 
+                        html.Th("标记价格"),
+                        html.Th("数据状态")
+                    ]))]
+                    
+                    candidates_table_rows = []
+                    
+                    for symbol, info in latest_contracts.items():
+                        funding_rate = info.get('funding_rate', 0)
+                        next_time = info.get('next_funding_time')
+                        data_source = info.get('data_source', 'unknown')
+                        
+                        if next_time:
+                            try:
+                                next_time_dt = datetime.fromtimestamp(int(next_time) / 1000)
+                                next_time_str = next_time_dt.strftime('%Y-%m-%d %H:%M:%S')
+                            except:
+                                next_time_str = str(next_time)
+                        else:
+                            next_time_str = "未知"
+                        
+                        # 根据资金费率设置颜色
+                        rate_color = "success" if abs(funding_rate) >= threshold else "secondary"
+                        rate_text = f"{funding_rate*100:.4f}%"
+                        
+                        # 数据状态指示
+                        if data_source == "real_time":
+                            status_badge = dbc.Badge("实时", color="success", className="ms-1")
+                        else:
+                            status_badge = dbc.Badge("缓存", color="warning", className="ms-1")
+                        
+                        candidates_table_rows.append(
+                            html.Tr([
+                                html.Td(symbol),
+                                html.Td(info.get("exchange", "")),
+                                html.Td(dbc.Badge(rate_text, color=rate_color)),
+                                html.Td(next_time_str),
+                                html.Td(f"${info.get('mark_price', 0):.4f}"),
+                                html.Td(status_badge)
+                            ])
+                        )
+                    
+                    candidates_table = dbc.Table(candidates_table_header + [html.Tbody(candidates_table_rows)], bordered=True, hover=True)
+                    
+                    # 统计信息
+                    notification_msg = f"✅ 成功获取 {len(latest_contracts)} 个合约的最新资金费率数据 (实时: {real_time_count}, 缓存: {cached_count}) | 缓存时间: {cache_time}"
+                    if warning_count > 0:
+                        notification_msg += f" | 📢 发现 {warning_count} 个高资金费率合约，已发送通知"
+                    
+                    print(f"📊 Web界面: 表格构建完成，实时数据: {real_time_count}, 缓存数据: {cached_count}")
+                    
+                    return candidates_table, notification_msg, True
                 else:
-                    next_time_str = "未知"
-                
-                # 根据资金费率设置颜色
-                rate_color = "success" if abs(funding_rate) >= 0.005 else "secondary"
-                rate_text = f"{funding_rate*100:.4f}%"
-                
-                # 数据状态指示
-                data_status = info.get("last_updated", "")
-                if data_status == "cached":
-                    status_badge = dbc.Badge("缓存", color="warning", className="ms-1")
-                else:
-                    status_badge = dbc.Badge("实时", color="success", className="ms-1")
-                
-                candidates_table_rows.append(
-                    html.Tr([
-                        html.Td(symbol),
-                        html.Td(info.get("exchange", "")),
-                        html.Td(dbc.Badge(rate_text, color=rate_color)),
-                        html.Td(next_time_str),
-                        html.Td(f"${info.get('mark_price', 0):.4f}"),
-                        html.Td(status_badge)
-                    ])
-                )
-            
-            candidates_table = dbc.Table(candidates_table_header + [html.Tbody(candidates_table_rows)], bordered=True, hover=True)
-            
-            # 统计信息
-            real_time_count = sum(1 for info in latest_contracts.values() if info.get("last_updated") != "cached")
-            cached_count = len(latest_contracts) - real_time_count
-            
-            notification_msg = f"✅ 成功获取 {len(latest_contracts)} 个合约的最新资金费率数据 (实时: {real_time_count}, 缓存: {cached_count})"
-            
-            return candidates_table, notification_msg, True
+                    print("⚠️ Web界面: 缓存文件中没有合约数据")
+                    return html.P("暂无最新资金费率数据"), "⚠️ 缓存文件中没有合约数据", True
+                    
+            except Exception as e:
+                error_msg = f"读取缓存文件失败: {str(e)}"
+                print(f"❌ Web界面: {error_msg}")
+                return dash.no_update, error_msg, True
         else:
-            return html.P("暂无最新资金费率数据"), "⚠️ 未获取到最新资金费率数据", True
+            print("⚠️ Web界面: 缓存文件不存在")
+            return html.P("缓存文件不存在"), "⚠️ 缓存文件不存在", True
             
     except Exception as e:
         error_msg = f"❌ 获取最新资金费率异常: {str(e)}"
+        print(f"❌ Web界面: {error_msg}")
+        print(f"❌ Web界面: 异常详情: {traceback.format_exc()}")
         return dash.no_update, error_msg, True
 
 # 刷新备选池回调 - 刷新数据并更新页面显示

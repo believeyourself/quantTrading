@@ -173,26 +173,119 @@ class FundingRateMonitor(BaseStrategy):
             print(f"❌ 刷新合约池失败: {e}")
 
     def check_funding_rates(self):
-        """检查资金费率并发送通知"""
+        """检查资金费率并发送通知 - 使用统一的API端点"""
         try:
+            print("🔄 定时任务: 开始检查资金费率...")
+            
+            # 调用统一的API端点获取最新资金费率
+            try:
+                import requests
+                api_url = "http://localhost:8000/funding_monitor/latest-rates"
+                response = requests.get(api_url, timeout=30)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    contracts = data.get('contracts', {})
+                    real_time_count = data.get('real_time_count', 0)
+                    cached_count = data.get('cached_count', 0)
+                    
+                    print(f"✅ 定时任务: 成功获取最新资金费率数据")
+                    print(f"📊 合约数量: {len(contracts)}, 实时: {real_time_count}, 缓存: {cached_count}")
+                    
+                    # 检查每个合约的资金费率
+                    warning_count = 0
+                    for symbol, info in contracts.items():
+                        try:
+                            funding_rate = float(info.get('funding_rate', 0))
+                            if abs(funding_rate) >= self.parameters['funding_rate_threshold']:
+                                # 资金费率超过阈值，发送通知
+                                direction = "多头" if funding_rate > 0 else "空头"
+                                mark_price = info.get('mark_price', 0)
+                                next_funding_time = info.get('next_funding_time', '未知')
+                                data_source = info.get('data_source', 'unknown')
+                                
+                                message = f"⚠️ 资金费率警告: {symbol}\n" \
+                                         f"当前费率: {funding_rate:.4%} ({direction})\n" \
+                                         f"标记价格: ${mark_price:.4f}\n" \
+                                         f"下次结算时间: {next_funding_time}\n" \
+                                         f"数据来源: {'实时' if data_source == 'real_time' else '缓存'}"
+                                
+                                send_telegram_message(message)
+                                warning_count += 1
+                                
+                        except (ValueError, TypeError) as e:
+                            print(f"⚠️ 处理合约 {symbol} 资金费率时出错: {e}")
+                            continue
+                    
+                    if warning_count > 0:
+                        print(f"📢 定时任务: 发送了 {warning_count} 个资金费率警告通知")
+                    else:
+                        print(f"✅ 定时任务: 所有合约资金费率都在正常范围内")
+                    
+                    # 更新本地缓存数据
+                    self.cached_contracts = contracts
+                    self.last_update_time = datetime.now()
+                    print(f"💾 定时任务: 本地缓存已更新")
+                    
+                else:
+                    print(f"❌ 定时任务: API调用失败，状态码: {response.status_code}")
+                    # API失败时，使用现有缓存数据进行检查
+                    self._check_existing_cache()
+                    
+            except requests.exceptions.ConnectionError:
+                print("❌ 定时任务: 无法连接到API服务器，使用现有缓存数据")
+                self._check_existing_cache()
+            except requests.exceptions.Timeout:
+                print("❌ 定时任务: API请求超时，使用现有缓存数据")
+                self._check_existing_cache()
+            except Exception as e:
+                print(f"❌ 定时任务: API调用异常: {e}")
+                # API异常时，使用现有缓存数据进行检查
+                self._check_existing_cache()
+            
+            print("✅ 定时任务: 资金费率检查完成")
+            
+        except Exception as e:
+            print(f"❌ 定时任务: 检查资金费率失败: {e}")
+
+    def _check_existing_cache(self):
+        """使用现有缓存数据检查资金费率（备用方案）"""
+        try:
+            print("🔄 定时任务: 使用现有缓存数据进行检查...")
+            
             if not self._is_cache_valid():
+                print("⚠️ 定时任务: 本地缓存已过期，尝试更新...")
                 self._update_cached_contracts()
             
-            # 检查每个合约的资金费率
-            for symbol, info in self.cached_contracts.items():
-                funding_rate = float(info.get('funding_rate', 0))
-                if abs(funding_rate) >= self.parameters['funding_rate_threshold']:
-                    # 资金费率超过阈值，发送通知
-                    direction = "多头" if funding_rate > 0 else "空头"
-                    message = f"⚠️ 资金费率警告: {symbol}\n" \
-                             f"当前费率: {funding_rate:.4%} ({direction})\n" \
-                             f"24h成交量: {info.get('volume_24h', 0):,.2f}\n" \
-                             f"下次结算时间: {info.get('next_funding_time')}"
-                    send_telegram_message(message)
-            
-            print("✅ 资金费率检查完成")
+            # 使用统一的资金费率检查逻辑
+            self._check_funding_rates_from_cache()
+                
         except Exception as e:
-            print(f"❌ 检查资金费率失败: {e}")
+            print(f"❌ 定时任务: 使用缓存数据检查失败: {e}")
+
+    def _check_funding_rates_from_cache(self):
+        """从缓存检查资金费率（统一逻辑）"""
+        try:
+            from utils.funding_rate_utils import FundingRateUtils
+            
+            # 使用工具类检查资金费率
+            warning_count, messages = FundingRateUtils.check_funding_rates(
+                self.cached_contracts, 
+                self.parameters['funding_rate_threshold'], 
+                "定时任务(缓存)"
+            )
+            
+            # 输出所有消息
+            for msg in messages:
+                print(f"    {msg}")
+            
+            if warning_count > 0:
+                print(f"📢 定时任务(缓存): 发送了 {warning_count} 个资金费率警告通知")
+            else:
+                print(f"✅ 定时任务(缓存): 所有合约资金费率都在正常范围内")
+                
+        except Exception as e:
+            print(f"❌ 定时任务: 缓存资金费率检查失败: {e}")
 
     def start_monitoring(self):
         """启动监控系统（包括定时任务）"""

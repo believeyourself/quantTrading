@@ -35,25 +35,52 @@ class BinanceFunding:
 
     def get_current_funding(self, symbol: str, contract_type: str = "UM") -> Optional[dict]:
         if not self.available:
+            print(f"❌ {symbol}: binance_interface 未安装或不可用")
             return None
         try:
             if contract_type == "UM":
                 res = self.um.market.get_premiumIndex(symbol=symbol)
             else:
                 res = self.cm.market.get_premiumIndex(symbol=symbol)
+                
             if res and res.get('code') == 200:
                 data = self._parse_single(res['data'])
-                return {
+                funding_rate = data.get('lastFundingRate', 0)
+                mark_price = data.get('markPrice', 0)
+                next_time = data.get('nextFundingTime')
+                
+                # 确保funding_rate是数值类型
+                try:
+                    funding_rate = float(funding_rate) if funding_rate is not None else 0.0
+                except (ValueError, TypeError):
+                    funding_rate = 0.0
+                
+                # 确保mark_price是数值类型
+                try:
+                    mark_price = float(mark_price) if mark_price is not None else 0.0
+                except (ValueError, TypeError):
+                    mark_price = 0.0
+                
+                result = {
                     'symbol': data.get('symbol', symbol),
-                    'funding_rate': data.get('lastFundingRate'),
-                    'next_funding_time': data.get('nextFundingTime'),
-                    'mark_price': data.get('markPrice'),
+                    'funding_rate': funding_rate,
+                    'next_funding_time': next_time,
+                    'mark_price': mark_price,
                     'index_price': data.get('indexPrice'),
                     'raw': data
                 }
-            return None
+                
+                # 格式化日志输出
+                rate_percent = funding_rate * 100
+                direction = "多头" if rate_percent > 0 else "空头" if rate_percent < 0 else "中性"
+                print(f"    📊 {symbol}: API调用成功 | 费率: {rate_percent:+.4f}% ({direction}) | 价格: ${mark_price:.4f}")
+                
+                return result
+            else:
+                print(f"    ❌ {symbol}: API响应异常 | 状态码: {res.get('code') if res else 'None'} | 响应: {res}")
+                return None
         except Exception as e:
-            print(f"❌ 获取当前资金费率失败: {e}")
+            print(f"    ❌ {symbol}: API调用异常 | 错误: {e}")
             return None
 
     def get_funding_history(self, symbol: str, contract_type: str = "UM", limit: int = 10) -> List[dict]:

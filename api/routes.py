@@ -174,8 +174,13 @@ def refresh_funding_candidates():
             raise HTTPException(status_code=500, detail=error_msg)
         
         # 筛选符合条件的合约（资金费率超过阈值）
-        threshold = 0.005  # 0.5%
-        min_volume = 1000000  # 100万USDT
+        try:
+            from config.settings import settings
+            threshold = settings.FUNDING_RATE_THRESHOLD
+            min_volume = settings.MIN_VOLUME
+        except ImportError:
+            threshold = 0.005  # 0.5% 默认值
+            min_volume = 1000000  # 100万USDT 默认值
         
         filtered_contracts = {}
         contracts_by_interval = {}  # 按结算周期分组存储
@@ -605,20 +610,25 @@ def get_cache_status():
 
 @app.get("/funding_monitor/latest-rates")
 def get_latest_funding_rates():
-    """获取所有结算周期合约的最新资金费率"""
+    """获取所有结算周期合约的最新资金费率并保存到缓存"""
     try:
         from utils.binance_funding import BinanceFunding
         funding = BinanceFunding()
+        
+        print("🔄 开始获取最新资金费率...")
         
         # 获取所有结算周期合约基础信息
         all_contracts_data = funding.get_all_intervals_from_cache()
         
         if not all_contracts_data or not all_contracts_data.get('contracts_by_interval'):
+            print("❌ 没有合约缓存数据，请先刷新合约缓存")
             return {
                 "status": "error",
                 "message": "没有合约缓存数据，请先刷新合约缓存",
                 "timestamp": datetime.now().isoformat()
             }
+        
+        print(f"📊 从缓存获取到 {len(all_contracts_data.get('contracts_by_interval', {}))} 个结算周期的合约数据")
         
         # 获取最新资金费率
         latest_rates = {}
@@ -626,59 +636,187 @@ def get_latest_funding_rates():
         cached_count = 0
         
         for interval, contracts in all_contracts_data['contracts_by_interval'].items():
+            print(f"\n🔍 处理 {interval} 结算周期合约，共 {len(contracts)} 个...")
+            
             for symbol in contracts.keys():
                 try:
+                    print(f"  📈 获取 {symbol} 最新资金费率...")
                     current_info = funding.get_current_funding(symbol, "UM")
+                    
                     if current_info:
+                        funding_rate = current_info.get('funding_rate', 0)
+                        mark_price = current_info.get('mark_price', 0)
+                        
+                        # 确保数据类型正确
+                        try:
+                            funding_rate = float(funding_rate) if funding_rate is not None else 0.0
+                        except (ValueError, TypeError):
+                            funding_rate = 0.0
+                        
+                        try:
+                            mark_price = float(mark_price) if mark_price is not None else 0.0
+                        except (ValueError, TypeError):
+                            mark_price = 0.0
+                        
                         latest_rates[symbol] = {
                             "symbol": symbol,
                             "exchange": "binance",
-                            "funding_rate": float(current_info.get('funding_rate', 0)),
+                            "funding_rate": funding_rate,
                             "next_funding_time": current_info.get('next_funding_time'),
                             "funding_interval": interval,
-                            "mark_price": current_info.get('mark_price'),
+                            "mark_price": mark_price,
                             "index_price": current_info.get('index_price'),
                             "last_updated": datetime.now().isoformat(),
                             "data_source": "real_time"
                         }
                         real_time_count += 1
+                        
+                        # 格式化资金费率显示
+                        rate_percent = funding_rate * 100
+                        direction = "多头" if funding_rate > 0 else "空头" if funding_rate < 0 else "中性"
+                        print(f"    ✅ {symbol}: {rate_percent:+.4f}% ({direction}) | 价格: ${mark_price:.4f} | 实时数据")
+                        
                     else:
                         # 使用缓存数据
                         cached_info = contracts.get(symbol, {})
+                        funding_rate = cached_info.get('current_funding_rate', 0)
+                        mark_price = cached_info.get('mark_price', 0)
+                        
+                        # 确保数据类型正确
+                        try:
+                            funding_rate = float(funding_rate) if funding_rate is not None else 0.0
+                        except (ValueError, TypeError):
+                            funding_rate = 0.0
+                        
+                        try:
+                            mark_price = float(mark_price) if mark_price is not None else 0.0
+                        except (ValueError, TypeError):
+                            mark_price = 0.0
+                        
                         latest_rates[symbol] = {
                             "symbol": symbol,
                             "exchange": "binance",
-                            "funding_rate": float(cached_info.get('current_funding_rate', 0)),
+                            "funding_rate": funding_rate,
                             "next_funding_time": cached_info.get('next_funding_time'),
                             "funding_interval": interval,
-                            "mark_price": cached_info.get('mark_price'),
+                            "mark_price": mark_price,
                             "index_price": cached_info.get('index_price'),
                             "last_updated": "cached",
                             "data_source": "cached",
                             "note": "使用缓存数据"
                         }
                         cached_count += 1
+                        
+                        # 格式化资金费率显示
+                        rate_percent = funding_rate * 100
+                        direction = "多头" if funding_rate > 0 else "空头" if funding_rate < 0 else "中性"
+                        print(f"    📋 {symbol}: {rate_percent:+.4f}% ({direction}) | 价格: ${mark_price:.4f} | 缓存数据")
                     
                     # 添加延迟避免API限流
                     time.sleep(0.1)
                     
                 except Exception as e:
-                    print(f"获取 {symbol} 最新资金费率失败: {e}")
+                    print(f"    ❌ 获取 {symbol} 最新资金费率失败: {e}")
                     # 使用缓存数据
                     cached_info = contracts.get(symbol, {})
+                    funding_rate = cached_info.get('current_funding_rate', 0)
+                    mark_price = cached_info.get('mark_price', 0)
+                    
+                    # 确保数据类型正确
+                    try:
+                        funding_rate = float(funding_rate) if funding_rate is not None else 0.0
+                    except (ValueError, TypeError):
+                        funding_rate = 0.0
+                    
+                    try:
+                        mark_price = float(mark_price) if mark_price is not None else 0.0
+                    except (ValueError, TypeError):
+                        mark_price = 0.0
+                    
                     latest_rates[symbol] = {
                         "symbol": symbol,
                         "exchange": "binance",
-                        "funding_rate": float(cached_info.get('current_funding_rate', 0)),
+                        "funding_rate": funding_rate,
                         "next_funding_time": cached_info.get('next_funding_time'),
                         "funding_interval": interval,
-                        "mark_price": cached_info.get('mark_price'),
+                        "mark_price": mark_price,
                         "index_price": cached_info.get('index_price'),
                         "last_updated": "cached",
                         "data_source": "cached",
                         "note": "使用缓存数据"
                     }
                     cached_count += 1
+                    
+                    # 格式化资金费率显示
+                    rate_percent = funding_rate * 100
+                    direction = "多头" if funding_rate > 0 else "空头" if funding_rate < 0 else "中性"
+                    print(f"    📋 {symbol}: {rate_percent:+.4f}% ({direction}) | 价格: ${mark_price:.4f} | 缓存数据(错误回退)")
+        
+        print(f"\n📊 资金费率获取完成:")
+        print(f"  📈 实时数据: {real_time_count} 个合约")
+        print(f"  📋 缓存数据: {cached_count} 个合约")
+        print(f"  📊 总计: {len(latest_rates)} 个合约")
+        
+        # 统计资金费率分布
+        positive_rates = [info['funding_rate'] for info in latest_rates.values() if info['funding_rate'] > 0]
+        negative_rates = [info['funding_rate'] for info in latest_rates.values() if info['funding_rate'] < 0]
+        zero_rates = [info['funding_rate'] for info in latest_rates.values() if info['funding_rate'] == 0]
+        
+        if positive_rates:
+            max_positive = max(positive_rates) * 100
+            print(f"  🟢 最高正费率: {max_positive:.4f}%")
+        if negative_rates:
+            min_negative = min(negative_rates) * 100
+            print(f"  🔴 最低负费率: {min_negative:.4f}%")
+        if zero_rates:
+            print(f"  ⚪ 零费率合约: {len(zero_rates)} 个")
+        
+        # 保存到缓存文件
+        try:
+            from utils.funding_rate_utils import FundingRateUtils
+            
+            cache_data = {
+                'cache_time': datetime.now().isoformat(),
+                'contracts': latest_rates,
+                'count': len(latest_rates),
+                'real_time_count': real_time_count,
+                'cached_count': cached_count,
+                'intervals': list(all_contracts_data.get('contracts_by_interval', {}).keys()),
+                'note': '最新资金费率缓存数据'
+            }
+            
+            cache_file = "cache/latest_funding_rates.json"
+            success = FundingRateUtils.save_cache_data(cache_data, cache_file, "最新资金费率数据")
+            
+            if success:
+                print(f"💾 最新资金费率数据已保存到缓存: {cache_file}")
+            else:
+                print(f"⚠️ 保存缓存失败")
+            
+        except ImportError:
+            # 后备方案：直接保存
+            try:
+                cache_data = {
+                    'cache_time': datetime.now().isoformat(),
+                    'contracts': latest_rates,
+                    'count': len(latest_rates),
+                    'real_time_count': real_time_count,
+                    'cached_count': cached_count,
+                    'intervals': list(all_contracts_data.get('contracts_by_interval', {}).keys()),
+                    'note': '最新资金费率缓存数据'
+                }
+                
+                os.makedirs("cache", exist_ok=True)
+                cache_file = "cache/latest_funding_rates.json"
+                with open(cache_file, 'w', encoding='utf-8') as f:
+                    json.dump(cache_data, f, ensure_ascii=False, indent=2)
+                
+                print(f"💾 最新资金费率数据已保存到缓存: {cache_file}")
+                
+            except Exception as e:
+                print(f"⚠️ 保存缓存失败: {e}")
+        except Exception as e:
+            print(f"⚠️ 保存缓存失败: {e}")
         
         return {
             "status": "success",
@@ -688,9 +826,9 @@ def get_latest_funding_rates():
             "cached_count": cached_count,
             "intervals": list(all_contracts_data.get('contracts_by_interval', {}).keys()),
             "timestamp": datetime.now().isoformat(),
-            "note": "包含最新实时资金费率数据"
+            "note": "包含最新实时资金费率数据，已保存到缓存"
         }
 
     except Exception as e:
-        print(f"获取最新资金费率异常: {e}\n{traceback.format_exc()}")
+        print(f"❌ 获取最新资金费率异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取最新资金费率失败: {str(e)}")
