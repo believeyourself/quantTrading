@@ -175,9 +175,8 @@ class BinanceFunding:
             return {}
 
     def scan_all_funding_contracts(self, contract_type="UM", force_refresh=False):
-        """扫描所有结算周期的合约并按周期分类缓存"""
+        """扫描所有结算周期的合约并缓存"""
         cache_file = "cache/all_funding_contracts_full.json"
-        cache_duration = 3600  # 1小时缓存
         
         # 检查缓存是否有效
         if not force_refresh and os.path.exists(cache_file):
@@ -185,71 +184,86 @@ class BinanceFunding:
                 with open(cache_file, 'r', encoding='utf-8') as f:
                     cache_data = json.load(f)
                 
-                # 检查缓存时间
                 cache_time = datetime.fromisoformat(cache_data.get('cache_time', '2000-01-01'))
-                if (datetime.now() - cache_time).total_seconds() < cache_duration:
-                    print(f"📋 使用缓存的所有结算周期合约")
-                    for interval, contracts in cache_data.get('contracts_by_interval', {}).items():
-                        print(f"  {interval}: {len(contracts)}个合约")
+                cache_age = (datetime.now() - cache_time).total_seconds()
+                
+                # 缓存有效期：1小时
+                if cache_age < 3600:
+                    print(f"📋 缓存有效，使用现有数据 (缓存时间: {cache_age:.0f}秒前)")
                     return cache_data.get('contracts_by_interval', {})
                 else:
-                    print("⏰ 缓存已过期，重新扫描...")
+                    print(f"🔄 缓存已过期 ({cache_age/3600:.2f}小时)，重新扫描...")
             except Exception as e:
                 print(f"⚠️ 读取缓存失败: {e}")
         
         print("🔍 开始扫描所有结算周期合约...")
         
-        # 获取所有合约信息
         try:
-            info = self.um.market.get_exchangeInfo()
-            if isinstance(info, dict) and 'data' in info:
-                symbols = info.get('data', {}).get('symbols', [])
+            # 获取所有永续合约
+            if contract_type == "UM":
+                res = self.um.market.get_exchangeInfo()
             else:
-                symbols = info.get('symbols', [])
+                res = self.cm.market.get_exchangeInfo()
             
-            # 筛选永续合约
+            if not res or res.get('code') != 200:
+                print("❌ 获取交易所信息失败")
+                return {}
+            
             perpetual_symbols = []
-            for s in symbols:
-                if s.get('contractType') == 'PERPETUAL':
-                    perpetual_symbols.append(s['symbol'])
+            for symbol_info in res['data']['symbols']:
+                if symbol_info['contractType'] == 'PERPETUAL':
+                    perpetual_symbols.append(symbol_info['symbol'])
             
-            print(f"📊 获取到 {len(perpetual_symbols)} 个永续合约")
+            print(f"📊 发现 {len(perpetual_symbols)} 个永续合约")
             
-            # 按结算周期分类合约
+            # 按结算周期分组
             contracts_by_interval = {}
             
             for i, symbol in enumerate(perpetual_symbols):
                 try:
-                    # 使用detect_funding_interval方法检测结算周期
-                    interval = self.detect_funding_interval(symbol, contract_type)
+                    # 获取资金费率信息
+                    funding_info = self.get_current_funding(symbol, contract_type)
+                    if not funding_info:
+                        continue
                     
-                    if interval:
-                        # 将结算周期分类到最接近的标准间隔
-                        if abs(interval - 1.0) < 0.1:
+                    # 获取24小时成交量
+                    volume_info = self.get_24h_volume(symbol, contract_type)
+                    
+                    # 检测结算周期
+                    funding_interval = self.detect_funding_interval(symbol, contract_type)
+                    if funding_interval:
+                        # 基于检测到的结算周期进行分类
+                        if funding_interval <= 1.5:
                             interval_key = "1h"
-                        elif abs(interval - 8.0) < 0.1:
-                            interval_key = "8h"
-                        elif abs(interval - 4.0) < 0.1:
-                            interval_key = "4h"
-                        elif abs(interval - 2.0) < 0.1:
+                        elif funding_interval <= 3:
                             interval_key = "2h"
-                        elif abs(interval - 12.0) < 0.1:
-                            interval_key = "12h"
-                        elif abs(interval - 24.0) < 0.1:
-                            interval_key = "24h"
+                        elif funding_interval <= 6:
+                            interval_key = "4h"
+                        elif funding_interval <= 12:
+                            interval_key = "8h"
                         else:
-                            # 其他间隔，按小时四舍五入
-                            interval_key = f"{round(interval)}h"
-                        
-                        # 获取合约详细信息
-                        contract_info = self.get_comprehensive_info(symbol, contract_type)
-                        if contract_info:
-                            if interval_key not in contracts_by_interval:
-                                contracts_by_interval[interval_key] = {}
-                            contracts_by_interval[interval_key][symbol] = contract_info
-                            print(f"  ✅ {symbol}: {interval_key}结算周期 (检测到: {interval:.2f}小时)")
+                            interval_key = "8h"  # 默认
                     else:
-                        print(f"  ⚠️ {symbol}: 无法检测结算周期")
+                        # 如果无法检测到，使用默认值
+                        interval_key = "8h"
+                    
+                    # 构建合约信息
+                    contract_info = {
+                        'symbol': symbol,
+                        'contract_type': contract_type,
+                        'current_funding_rate': funding_info.get('funding_rate', 0),
+                        'next_funding_time': funding_info.get('next_funding_time'),
+                        'funding_interval_hours': funding_interval if funding_interval else 8.0,
+                        'mark_price': funding_info.get('mark_price', 0),
+                        'index_price': funding_info.get('raw', {}).get('indexPrice', 0),
+                        'volume_24h': volume_info if volume_info else 0,
+                        'last_updated': datetime.now().isoformat()
+                    }
+                    
+                    # 按结算周期分组
+                    if interval_key not in contracts_by_interval:
+                        contracts_by_interval[interval_key] = {}
+                    contracts_by_interval[interval_key][symbol] = contract_info
                     
                     # 限流控制
                     if (i + 1) % 50 == 0:
@@ -266,10 +280,64 @@ class BinanceFunding:
                         print(f"  ❌ {symbol}: 检测失败 - {e}")
                     continue
             
-            # 保存主缓存文件
+            # 获取并保存最新资金费率数据
+            latest_rates = {}
+            print("🔄 获取最新资金费率数据...")
+            
+            for interval_key, contracts in contracts_by_interval.items():
+                for symbol in contracts.keys():
+                    try:
+                        # 获取最新资金费率
+                        current_info = self.get_current_funding(symbol, contract_type)
+                        if current_info:
+                            latest_rates[symbol] = {
+                                "symbol": symbol,
+                                "exchange": "binance",
+                                "funding_rate": current_info.get('funding_rate', 0),
+                                "next_funding_time": current_info.get('next_funding_time'),
+                                "funding_interval": interval_key,
+                                "mark_price": current_info.get('mark_price', 0),
+                                "index_price": current_info.get('index_price'),
+                                "last_updated": datetime.now().isoformat(),
+                                "data_source": "real_time"
+                            }
+                        else:
+                            # 使用缓存数据
+                            cached_info = contracts[symbol]
+                            latest_rates[symbol] = {
+                                "symbol": symbol,
+                                "exchange": "binance",
+                                "funding_rate": cached_info.get('current_funding_rate', 0),
+                                "next_funding_time": cached_info.get('next_funding_time'),
+                                "funding_interval": interval_key,
+                                "mark_price": cached_info.get('mark_price', 0),
+                                "index_price": cached_info.get('index_price'),
+                                "last_updated": datetime.now().isoformat(),
+                                "data_source": "cached"
+                            }
+                    except Exception as e:
+                        print(f"    ⚠️ {symbol}: 获取最新资金费率失败: {e}")
+                        # 使用缓存数据
+                        cached_info = contracts[symbol]
+                        latest_rates[symbol] = {
+                            "symbol": symbol,
+                            "exchange": "binance",
+                            "funding_rate": cached_info.get('current_funding_rate', 0),
+                            "next_funding_time": cached_info.get('next_funding_time'),
+                            "funding_interval": interval_key,
+                            "mark_price": cached_info.get('mark_price', 0),
+                            "index_price": cached_info.get('index_price'),
+                            "last_updated": datetime.now().isoformat(),
+                            "data_source": "error_fallback"
+                        }
+            
+            print(f"📊 获取到 {len(latest_rates)} 个合约的最新资金费率")
+            
+            # 保存全量缓存文件（包含最新资金费率）
             cache_data = {
                 'cache_time': datetime.now().isoformat(),
                 'contracts_by_interval': contracts_by_interval,
+                'latest_rates': latest_rates,
                 'total_scanned': len(perpetual_symbols),
                 'intervals_found': list(contracts_by_interval.keys())
             }
@@ -278,25 +346,10 @@ class BinanceFunding:
             with open(cache_file, 'w', encoding='utf-8') as f:
                 json.dump(cache_data, f, ensure_ascii=False, indent=2)
             
-            # 为每个结算周期创建单独的缓存文件
-            for interval_key, contracts in contracts_by_interval.items():
-                interval_cache_file = f"cache/{interval_key}_funding_contracts_full.json"
-                interval_cache_data = {
-                    'cache_time': datetime.now().isoformat(),
-                    'contracts': contracts,
-                    'interval': interval_key,
-                    'contract_count': len(contracts)
-                }
-                
-                with open(interval_cache_file, 'w', encoding='utf-8') as f:
-                    json.dump(interval_cache_data, f, ensure_ascii=False, indent=2)
-                
-                print(f"💾 {interval_key}结算周期合约已缓存到 {interval_cache_file} ({len(contracts)}个)")
-            
             print(f"✅ 所有结算周期合约扫描完成")
             for interval_key, contracts in contracts_by_interval.items():
                 print(f"  {interval_key}: {len(contracts)}个合约")
-            print(f"💾 主缓存已保存到 {cache_file}")
+            print(f"💾 全量缓存已保存到 {cache_file}")
             
             return contracts_by_interval
             
@@ -312,7 +365,7 @@ class BinanceFunding:
 
     def get_contracts_by_interval_from_cache(self, interval: str = "1h", tg_notifier=None):
         """从缓存获取指定结算周期的合约"""
-        cache_file = f"cache/{interval}_funding_contracts_full.json"
+        cache_file = "cache/all_funding_contracts_full.json" # 使用全量缓存文件
         cache_duration = 3600  # 1小时缓存有效期
         
         if os.path.exists(cache_file):
@@ -323,12 +376,17 @@ class BinanceFunding:
                 cache_time = datetime.fromisoformat(cache_data.get('cache_time', '2000-01-01'))
                 cache_age = (datetime.now() - cache_time).total_seconds()
                 
-                print(f"📋 {interval}结算周期缓存时间: {cache_age:.0f}秒前")
-                print(f"📊 {interval}结算周期合约: {len(cache_data.get('contracts', {}))}个")
+                print(f"📋 全量缓存时间: {cache_age:.0f}秒前")
+                
+                # 从全量缓存中获取指定结算周期的合约
+                contracts_by_interval = cache_data.get('contracts_by_interval', {})
+                target_contracts = contracts_by_interval.get(interval, {})
+                
+                print(f"📊 {interval}结算周期合约: {len(target_contracts)}个")
                 
                 # 检查缓存是否过期
                 if cache_age > cache_duration:
-                    msg = f"⚠️ {interval}结算周期合约缓存已过期 {cache_age/3600:.2f} 小时，定时任务可能未正常更新！"
+                    msg = f"⚠️ 全量合约缓存已过期 {cache_age/3600:.2f} 小时，定时任务可能未正常更新！"
                     print(msg)
                     if tg_notifier:
                         try:
@@ -336,12 +394,12 @@ class BinanceFunding:
                         except Exception as e:
                             print(f"❌ 发送Telegram通知失败: {e}")
                 
-                return cache_data.get('contracts', {})
+                return target_contracts
             except Exception as e:
-                print(f"⚠️ 读取{interval}结算周期缓存失败: {e}")
+                print(f"⚠️ 读取全量缓存失败: {e}")
                 if tg_notifier:
                     try:
-                        tg_notifier(f"❌ 读取{interval}结算周期合约缓存失败: {e}")
+                        tg_notifier(f"❌ 读取全量合约缓存失败: {e}")
                     except Exception as notify_e:
                         print(f"❌ 发送Telegram通知失败: {notify_e}")
         
@@ -528,27 +586,20 @@ def get_klines(symbol, interval, start_time, end_time):
 def load_cached_funding_rates():
     """从缓存加载资金费率数据"""
     try:
-        # 尝试从多个缓存文件加载数据
-        cache_files = [
-            "cache/funding_rate_contracts.json",
-            "cache/1h_funding_contracts_full.json",
-            "cache/2h_funding_contracts_full.json",
-            "cache/4h_funding_contracts_full.json",
-            "cache/8h_funding_contracts_full.json"
-        ]
-        
+        # 尝试从缓存文件加载数据
+        cache_file = "cache/all_funding_contracts_full.json"
         result = {}
         
-        for cache_file in cache_files:
-            if os.path.exists(cache_file):
-                try:
-                    with open(cache_file, 'r', encoding='utf-8') as f:
-                        cached_data = json.load(f)
-                        
-                        # 处理不同的缓存格式
-                        if 'contracts' in cached_data:
-                            # 新格式：包含contracts字段
-                            contracts = cached_data['contracts']
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    cached_data = json.load(f)
+                    
+                    # 处理不同的缓存格式
+                    if 'contracts_by_interval' in cached_data:
+                        # 新格式：包含contracts_by_interval字段
+                        contracts_by_interval = cached_data['contracts_by_interval']
+                        for interval_key, contracts in contracts_by_interval.items():
                             for symbol, data in contracts.items():
                                 if isinstance(data, dict):
                                     result[symbol] = {
@@ -557,28 +608,26 @@ def load_cached_funding_rates():
                                         'markPrice': data.get('mark_price', '0'),
                                         'indexPrice': data.get('index_price', '0')
                                     }
-                        else:
-                            # 旧格式：直接是合约数据
-                            for symbol, data in cached_data.items():
-                                if isinstance(data, dict) and 'funding_rate' in data:
-                                    result[symbol] = {
-                                        'symbol': symbol,
-                                        'lastFundingRate': data['funding_rate'],
-                                        'markPrice': data.get('mark_price', '0'),
-                                        'indexPrice': data.get('index_price', '0')
-                                    }
-                                    
-                except Exception as e:
-                    print(f"⚠️ 读取缓存文件 {cache_file} 失败: {e}")
-                    continue
+                    else:
+                        # 旧格式：直接是合约数据
+                        for symbol, data in cached_data.items():
+                            if isinstance(data, dict) and 'funding_rate' in data:
+                                result[symbol] = {
+                                    'symbol': symbol,
+                                    'lastFundingRate': data['funding_rate'],
+                                    'markPrice': data.get('mark_price', '0'),
+                                    'indexPrice': data.get('index_price', '0')
+                                }
+                    
+                    if result:
+                        print(f"📋 从缓存加载了 {len(result)} 个合约的资金费率数据")
+                        result['_from_cache'] = True
+                    else:
+                        print("⚠️ 缓存文件中没有合约数据")
+                        
+            except Exception as e:
+                print(f"⚠️ 读取缓存文件 {cache_file} 失败: {e}")
         
-        if result:
-            print(f"📋 从缓存加载了 {len(result)} 个合约的资金费率数据")
-            # 标记数据来源为缓存
-            result['_from_cache'] = True
-        else:
-            print("⚠️ 所有缓存文件都无法读取或为空")
-            
         return result
         
     except Exception as e:
@@ -588,53 +637,44 @@ def load_cached_funding_rates():
 def load_cached_24h_volumes():
     """从缓存加载24小时成交量数据"""
     try:
-        # 尝试从多个缓存文件加载数据
-        cache_files = [
-            "cache/funding_rate_contracts.json",
-            "cache/1h_funding_contracts_full.json",
-            "cache/2h_funding_contracts_full.json",
-            "cache/4h_funding_contracts_full.json",
-            "cache/8h_funding_contracts_full.json"
-        ]
-        
+        # 尝试从缓存文件加载数据
+        cache_file = "cache/all_funding_contracts_full.json"
         result = {}
         
-        for cache_file in cache_files:
-            if os.path.exists(cache_file):
-                try:
-                    with open(cache_file, 'r', encoding='utf-8') as f:
-                        cached_data = json.load(f)
-                        
-                        # 处理不同的缓存格式
-                        if 'contracts' in cached_data:
-                            # 新格式：包含contracts字段
-                            contracts = cached_data['contracts']
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    cached_data = json.load(f)
+                    
+                    # 处理不同的缓存格式
+                    if 'contracts_by_interval' in cached_data:
+                        # 新格式：包含contracts_by_interval字段
+                        contracts_by_interval = cached_data['contracts_by_interval']
+                        for interval_key, contracts in contracts_by_interval.items():
                             for symbol, data in contracts.items():
                                 if isinstance(data, dict) and 'volume_24h' in data:
                                     try:
                                         result[symbol] = float(data['volume_24h'])
                                     except (ValueError, TypeError):
                                         continue
-                        else:
-                            # 旧格式：直接是合约数据
-                            for symbol, data in cached_data.items():
-                                if isinstance(data, dict) and 'volume_24h' in data:
-                                    try:
-                                        result[symbol] = float(data['volume_24h'])
-                                    except (ValueError, TypeError):
-                                        continue
-                                    
-                except Exception as e:
-                    print(f"⚠️ 读取缓存文件 {cache_file} 失败: {e}")
-                    continue
+                    else:
+                        # 旧格式：直接是合约数据
+                        for symbol, data in cached_data.items():
+                            if isinstance(data, dict) and 'volume_24h' in data:
+                                try:
+                                    result[symbol] = float(data['volume_24h'])
+                                except (ValueError, TypeError):
+                                    continue
+                    
+                    if result:
+                        print(f"📋 从缓存加载了 {len(result)} 个合约的24小时成交量数据")
+                        result['_from_cache'] = True
+                    else:
+                        print("⚠️ 缓存文件中没有合约数据")
+                        
+            except Exception as e:
+                print(f"⚠️ 读取缓存文件 {cache_file} 失败: {e}")
         
-        if result:
-            print(f"📋 从缓存加载了 {len(result)} 个合约的24小时成交量数据")
-            # 标记数据来源为缓存
-            result['_from_cache'] = True
-        else:
-            print("⚠️ 所有缓存文件都无法读取或为空")
-            
         return result
         
     except Exception as e:

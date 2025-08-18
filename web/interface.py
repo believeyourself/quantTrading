@@ -16,9 +16,12 @@ app = dash.Dash(__name__, external_stylesheets=[
 app.title = "加密货币资金费率监控系统"
 
 def load_cached_data(interval="1h"):
-    """直接加载本地缓存数据，不调用API"""
+    """直接加载本地缓存数据，优先读取最新资金费率缓存"""
     try:
         print(f"📋 开始加载本地缓存数据，结算周期: {interval}")
+        
+        # 不再需要单独读取最新资金费率缓存，直接从合并后的全量缓存读取
+        print("📋 使用合并后的全量缓存文件")
         
         # 直接读取监控合约缓存文件
         pool_contracts = []
@@ -51,43 +54,83 @@ def load_cached_data(interval="1h"):
         except Exception as e:
             print(f"⚠️ 读取监控合约缓存失败: {e}")
 
-        # 直接读取指定结算周期的缓存文件
+        # 从合并后的全量缓存文件中读取数据
         candidates = {}
         update_time = "未知"
+        
         try:
-            cache_file = f"cache/{interval}_funding_contracts_full.json"
+            cache_file = "cache/all_funding_contracts_full.json"
             if os.path.exists(cache_file):
                 with open(cache_file, 'r', encoding='utf-8') as f:
                     cache_data = json.load(f)
-                    candidates = cache_data.get('contracts', {})
-                    # 获取缓存时间
+                
+                # 优先使用latest_rates中的数据（如果存在）
+                latest_rates = cache_data.get('latest_rates', {})
+                if latest_rates:
+                    print(f"📋 使用合并缓存中的最新资金费率数据，共 {len(latest_rates)} 个合约")
+                    
+                    # 筛选指定结算周期的合约
+                    for symbol, info in latest_rates.items():
+                        funding_interval = info.get('funding_interval')
+                        if funding_interval == interval:
+                            candidates[symbol] = info
+                            print(f"    ✅ {symbol}: {funding_interval} -> {interval}")
+                        else:
+                            print(f"    ⚠️ {symbol}: {funding_interval} != {interval} (跳过)")
+                    
+                    # 使用最新缓存时间
                     cache_time = cache_data.get('cache_time', '')
                     if cache_time:
                         try:
-                            # 解析缓存时间并格式化为北京时间
-                            from datetime import datetime, timezone, timedelta
+                            # 解析缓存时间（缓存文件中的时间是本地时间，不需要时区转换）
+                            from datetime import datetime
                             if 'T' in cache_time:
-                                # ISO格式时间
-                                dt = datetime.fromisoformat(cache_time.replace('Z', '+00:00'))
+                                # ISO格式时间，直接解析为本地时间
+                                dt = datetime.fromisoformat(cache_time)
                             else:
                                 # 其他格式，尝试解析
                                 dt = datetime.strptime(cache_time, '%Y-%m-%d %H:%M:%S')
                             
-                            # 转换为北京时间
-                            if dt.tzinfo is None:
-                                dt = dt.replace(tzinfo=timezone.utc)
-                            beijing_time = dt.astimezone(timezone(timedelta(hours=8)))
-                            update_time = beijing_time.strftime('%Y-%m-%d %H:%M:%S')
+                            # 直接使用本地时间，不需要时区转换
+                            update_time = dt.strftime('%Y-%m-%d %H:%M:%S')
                         except Exception as e:
                             print(f"⚠️ 解析缓存时间失败: {e}")
                             update_time = cache_time
                     
-                    print(f"📋 从本地缓存加载了 {len(candidates)} 个{interval}结算周期合约")
+                    print(f"📋 筛选出 {len(candidates)} 个{interval}结算周期合约")
+                    print(f"📅 缓存时间: {update_time}")
+                
+                # 如果没有找到合约，则从contracts_by_interval中获取
+                if not candidates:
+                    print(f"⚠️ 最新资金费率数据中没有找到{interval}结算周期合约，使用基础合约数据")
+                    contracts_by_interval = cache_data.get('contracts_by_interval', {})
+                    candidates = contracts_by_interval.get(interval, {})
+                    
+                    # 获取缓存时间
+                    cache_time = cache_data.get('cache_time', '')
+                    if cache_time:
+                        try:
+                            # 解析缓存时间（缓存文件中的时间是本地时间，不需要时区转换）
+                            from datetime import datetime
+                            if 'T' in cache_time:
+                                # ISO格式时间，直接解析为本地时间
+                                dt = datetime.fromisoformat(cache_time)
+                            else:
+                                # 其他格式，尝试解析
+                                dt = datetime.strptime(cache_time, '%Y-%m-%d %H:%M:%S')
+                            
+                            # 直接使用本地时间，不需要时区转换
+                            update_time = dt.strftime('%Y-%m-%d %H:%M:%S')
+                        except Exception as e:
+                            print(f"⚠️ 解析缓存时间失败: {e}")
+                            update_time = cache_time
+                    
+                    print(f"📋 从基础合约数据加载了 {len(candidates)} 个{interval}结算周期合约")
                     print(f"📅 缓存时间: {update_time}")
             else:
-                print(f"📋 {interval}结算周期缓存文件不存在: {cache_file}")
+                print(f"📋 全量缓存文件不存在: {cache_file}")
         except Exception as e:
-            print(f"⚠️ 读取{interval}结算周期缓存失败: {e}")
+            print(f"⚠️ 读取全量缓存失败: {e}")
         
         print("🔧 开始构建表格...")
         result = build_tables(pool_contracts, candidates, interval, update_time)
@@ -248,7 +291,8 @@ def update_candidates_data(refresh_clicks, current_interval):
         error_msg = f"刷新本地缓存数据失败: {str(e)}"
         print(f"❌ 刷新本地缓存数据异常: {error_msg}")
         print(f"❌ 异常详情: {traceback.format_exc()}")
-        return f"刷新本地缓存数据失败: {str(e)}", f"刷新本地缓存数据失败: {str(e)}", "刷新失败"
+        error_table = html.P(f"❌ {error_msg}", className="text-danger")
+        return error_table, error_table, "刷新失败", "刷新失败"
         
 def build_tables(pool_contracts, candidates, interval="1h", update_time="未知"):
     """构建表格组件"""
@@ -588,19 +632,27 @@ def get_latest_funding_rates(latest_rates_clicks, current_interval):
         
         print(f"✅ Web界面: API调用成功，缓存已更新")
         
-        # 直接从缓存文件读取数据以获取统计信息
-        cache_file = "cache/latest_funding_rates.json"
-        if os.path.exists(cache_file):
+        # 从合并后的全量缓存文件读取数据以获取统计信息
+        all_cache_file = "cache/all_funding_contracts_full.json"
+        if os.path.exists(all_cache_file):
             try:
-                with open(cache_file, 'r', encoding='utf-8') as f:
-                    cache_data = json.load(f)
+                with open(all_cache_file, 'r', encoding='utf-8') as f:
+                    all_cache_data = json.load(f)
                 
-                latest_contracts = cache_data.get('contracts', {})
-                real_time_count = cache_data.get('real_time_count', 0)
-                cached_count = cache_data.get('cached_count', 0)
-                cache_time = cache_data.get('cache_time', '')
+                # 获取latest_rates字段
+                latest_contracts = all_cache_data.get('latest_rates', {})
+                cache_time = all_cache_data.get('cache_time', '')
                 
-                print(f"📋 Web界面: 从缓存读取到 {len(latest_contracts)} 个合约数据")
+                # 统计实时数据和缓存数据
+                real_time_count = 0
+                cached_count = 0
+                for info in latest_contracts.values():
+                    if info.get('data_source') == 'real_time':
+                        real_time_count += 1
+                    else:
+                        cached_count += 1
+                
+                print(f"📋 Web界面: 从合并缓存读取到 {len(latest_contracts)} 个合约数据")
                 print(f"📊 Web界面: 实时数据: {real_time_count}, 缓存数据: {cached_count}")
                 
                 # 检查资金费率并发送通知（统一通知逻辑）
@@ -645,12 +697,12 @@ def get_latest_funding_rates(latest_rates_clicks, current_interval):
                 return notification_msg, True
                 
             except Exception as e:
-                error_msg = f"读取缓存文件失败: {str(e)}"
+                error_msg = f"读取合并缓存文件失败: {str(e)}"
                 print(f"❌ Web界面: {error_msg}")
                 return error_msg, True
         else:
-            print("⚠️ Web界面: 缓存文件不存在")
-            return "⚠️ 缓存文件不存在", True
+            print("⚠️ Web界面: 合并缓存文件不存在")
+            return "⚠️ 合并缓存文件不存在", True
             
     except Exception as e:
         error_msg = f"❌ 获取最新资金费率异常: {str(e)}"
@@ -745,17 +797,19 @@ def sort_candidates_by_funding_rate(asc_clicks, desc_clicks, current_interval):
         interval = current_interval if current_interval else "1h"
         print(f"🔄 排序结算周期: {interval}")
         
-        # 直接从缓存文件读取原始数据
+        # 从全量缓存文件读取原始数据
         try:
-            cache_file = f"cache/{interval}_funding_contracts_full.json"
+            cache_file = "cache/all_funding_contracts_full.json"
             if not os.path.exists(cache_file):
-                error_msg = f"缓存文件不存在: {cache_file}"
+                error_msg = f"全量缓存文件不存在: {cache_file}"
                 print(f"❌ {error_msg}")
                 return dash.no_update, f"当前显示: {interval}结算周期合约 (排序失败: {error_msg})"
             
             with open(cache_file, 'r', encoding='utf-8') as f:
                 cache_data = json.load(f)
-                candidates = cache_data.get('contracts', {})
+                # 从全量缓存中获取指定结算周期的合约
+                contracts_by_interval = cache_data.get('contracts_by_interval', {})
+                candidates = contracts_by_interval.get(interval, {})
             
             if not candidates:
                 error_msg = "没有合约数据可排序"
@@ -842,6 +896,32 @@ def sort_candidates_by_funding_rate(asc_clicks, desc_clicks, current_interval):
                 html.Th("操作")
             ]))]
             
+            # 获取缓存更新时间
+            update_time = "未知"
+            try:
+                # 使用已经读取的全量缓存数据
+                cache_time = cache_data.get('cache_time', '')
+                if cache_time:
+                    try:
+                        # 解析缓存时间并格式化为北京时间
+                        if 'T' in cache_time:
+                            # ISO格式时间
+                            dt = datetime.fromisoformat(cache_time.replace('Z', '+00:00'))
+                        else:
+                            # 其他格式，尝试解析
+                            dt = datetime.strptime(cache_time, '%Y-%m-%d %H:%M:%S')
+                        
+                        # 转换为北京时间
+                        if dt.tzinfo is None:
+                            dt = dt.replace(tzinfo=timezone.utc)
+                        beijing_time = dt.astimezone(timezone(timedelta(hours=8)))
+                        update_time = beijing_time.strftime('%Y-%m-%d %H:%M:%S')
+                    except Exception as e:
+                        print(f"⚠️ 解析缓存时间失败: {e}")
+                        update_time = cache_time
+            except Exception as e:
+                print(f"⚠️ 获取缓存时间失败: {e}")
+            
             candidates_table_rows = []
             for item in candidates_list:
                 try:
@@ -877,35 +957,6 @@ def sort_candidates_by_funding_rate(asc_clicks, desc_clicks, current_interval):
             
             sort_direction = "升序" if sort_asc else "降序"
             count_text = f"当前显示: {interval}结算周期合约 (已按资金费率{sort_direction}排列)"
-            
-            # 获取缓存更新时间
-            update_time = "未知"
-            try:
-                cache_file = f"cache/{interval}_funding_contracts_full.json"
-                if os.path.exists(cache_file):
-                    with open(cache_file, 'r', encoding='utf-8') as f:
-                        cache_data = json.load(f)
-                        cache_time = cache_data.get('cache_time', '')
-                        if cache_time:
-                            try:
-                                # 解析缓存时间并格式化为北京时间
-                                if 'T' in cache_time:
-                                    # ISO格式时间
-                                    dt = datetime.fromisoformat(cache_time.replace('Z', '+00:00'))
-                                else:
-                                    # 其他格式，尝试解析
-                                    dt = datetime.strptime(cache_time, '%Y-%m-%d %H:%M:%S')
-                                
-                                # 转换为北京时间
-                                if dt.tzinfo is None:
-                                    dt = dt.replace(tzinfo=timezone.utc)
-                                beijing_time = dt.astimezone(timezone(timedelta(hours=8)))
-                                update_time = beijing_time.strftime('%Y-%m-%d %H:%M:%S')
-                            except Exception as e:
-                                print(f"⚠️ 解析缓存时间失败: {e}")
-                                update_time = cache_time
-            except Exception as e:
-                print(f"⚠️ 获取缓存时间失败: {e}")
             
             print(f"✅ 备选合约已按资金费率{sort_direction}排列")
             return sorted_table, count_text, update_time

@@ -190,12 +190,16 @@ def test_data_connection():
         # 内联数据读取功能
         symbols = []
         try:
-            cache_file = "cache/1h_funding_contracts_full.json"
+            cache_file = "cache/all_funding_contracts_full.json"
             if os.path.exists(cache_file):
                 with open(cache_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    contracts = data.get('contracts', {})
-                    symbols = list(contracts.keys())
+                    # 从全量缓存中获取所有合约
+                    contracts_by_interval = data.get('contracts_by_interval', {})
+                    all_contracts = {}
+                    for interval, contracts in contracts_by_interval.items():
+                        all_contracts.update(contracts)
+                    symbols = list(all_contracts.keys())
         except Exception as e:
             logger.warning(f"读取缓存文件失败: {e}")
         
@@ -209,9 +213,14 @@ def test_data_connection():
                 if os.path.exists(cache_file):
                     with open(cache_file, 'r', encoding='utf-8') as f:
                         data = json.load(f)
-                        contracts = data.get('contracts', {})
-                        if test_symbol in contracts:
-                            price = contracts[test_symbol].get('mark_price', 0)
+                        # 从全量缓存中查找合约
+                        contracts_by_interval = data.get('contracts_by_interval', {})
+                        all_contracts = {}
+                        for interval, contracts in contracts_by_interval.items():
+                            all_contracts.update(contracts)
+                        
+                        if test_symbol in all_contracts:
+                            price = all_contracts[test_symbol].get('mark_price', 0)
             except Exception as e:
                 logger.warning(f"读取价格失败: {e}")
             

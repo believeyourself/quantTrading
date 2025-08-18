@@ -136,6 +136,63 @@ class FundingRateMonitor(BaseStrategy):
             with self._update_lock:
                 self._updating = False
 
+    def update_existing_contracts_funding_rates(self):
+        """更新现有合约池中合约的最新资金费率（不改变合约池大小）"""
+        try:
+            print("🔄 开始更新现有合约池中合约的最新资金费率...")
+            
+            if not self.contract_pool:
+                print("⚠️ 合约池为空，无法更新资金费率")
+                return
+            
+            # 从合并后的全量缓存获取最新资金费率数据
+            all_cache_file = "cache/all_funding_contracts_full.json"
+            if not os.path.exists(all_cache_file):
+                print("⚠️ 全量缓存文件不存在")
+                return
+            
+            try:
+                with open(all_cache_file, 'r', encoding='utf-8') as f:
+                    all_cache_data = json.load(f)
+                
+                # 获取latest_rates字段
+                latest_rates = all_cache_data.get('latest_rates', {})
+                if not latest_rates:
+                    print("⚠️ 全量缓存中没有最新资金费率数据")
+                    return
+                updated_count = 0
+                
+                # 只更新现有合约池中的合约
+                for symbol in list(self.contract_pool):
+                    if symbol in latest_rates:
+                        latest_info = latest_rates[symbol]
+                        
+                        # 更新缓存中的合约信息
+                        if symbol in self.cached_contracts:
+                            # 保持原有结构，只更新资金费率相关字段
+                            self.cached_contracts[symbol].update({
+                                'current_funding_rate': latest_info.get('funding_rate', 0),
+                                'mark_price': latest_info.get('mark_price', 0),
+                                'index_price': latest_info.get('index_price'),
+                                'next_funding_time': latest_info.get('next_funding_time'),
+                                'last_updated': latest_info.get('last_updated', datetime.now().isoformat())
+                            })
+                            updated_count += 1
+                
+                if updated_count > 0:
+                    # 保存更新后的缓存
+                    self._save_cache()
+                    self.last_update_time = datetime.now()
+                    print(f"✅ 成功更新了 {updated_count} 个合约的最新资金费率")
+                else:
+                    print("⚠️ 没有找到需要更新的合约")
+                    
+            except Exception as e:
+                print(f"❌ 更新现有合约资金费率失败: {e}")
+                
+        except Exception as e:
+            print(f"❌ 更新现有合约资金费率异常: {e}")
+
     def refresh_contract_pool(self, force_refresh=False):
         """刷新合约池 - 入池出池逻辑"""
         try:
@@ -284,10 +341,11 @@ class FundingRateMonitor(BaseStrategy):
                     self.last_update_time = datetime.now()
                     print(f"💾 定时任务: 本地缓存已更新")
                     
+                    # 同时更新现有合约池中合约的最新资金费率
+                    self.update_existing_contracts_funding_rates()
+                    
                 else:
                     print(f"❌ 定时任务: API调用失败，状态码: {response.status_code}")
-                    # API失败时，使用现有缓存数据进行检查
-                    self._check_existing_cache()
                     
             except requests.exceptions.ConnectionError:
                 print("❌ 定时任务: 无法连接到API服务器，使用现有缓存数据")

@@ -80,12 +80,16 @@ def get_symbols():
         # 内联数据读取功能
         symbols = []
         try:
-            cache_file = "cache/1h_funding_contracts_full.json"
+            cache_file = "cache/all_funding_contracts_full.json"
             if os.path.exists(cache_file):
                 with open(cache_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    contracts = data.get('contracts', {})
-                    symbols = list(contracts.keys())
+                    # 从全量缓存中获取所有合约
+                    contracts_by_interval = data.get('contracts_by_interval', {})
+                    all_contracts = {}
+                    for interval, contracts in contracts_by_interval.items():
+                        all_contracts.update(contracts)
+                    symbols = list(all_contracts.keys())
         except Exception as e:
             print(f"读取缓存文件失败: {e}")
         
@@ -771,52 +775,9 @@ def get_latest_funding_rates():
         if zero_rates:
             print(f"  ⚪ 零费率合约: {len(zero_rates)} 个")
         
-        # 保存到缓存文件
-        try:
-            from utils.funding_rate_utils import FundingRateUtils
-            
-            cache_data = {
-                'cache_time': datetime.now().isoformat(),
-                'contracts': latest_rates,
-                'count': len(latest_rates),
-                'real_time_count': real_time_count,
-                'cached_count': cached_count,
-                'intervals': list(all_contracts_data.get('contracts_by_interval', {}).keys()),
-                'note': '最新资金费率缓存数据'
-            }
-            
-            cache_file = "cache/latest_funding_rates.json"
-            success = FundingRateUtils.save_cache_data(cache_data, cache_file, "最新资金费率数据")
-            
-            if success:
-                print(f"💾 最新资金费率数据已保存到缓存: {cache_file}")
-            else:
-                print(f"⚠️ 保存缓存失败")
-            
-        except ImportError:
-            # 后备方案：直接保存
-            try:
-                cache_data = {
-                    'cache_time': datetime.now().isoformat(),
-                    'contracts': latest_rates,
-                    'count': len(latest_rates),
-                    'real_time_count': real_time_count,
-                    'cached_count': cached_count,
-                    'intervals': list(all_contracts_data.get('contracts_by_interval', {}).keys()),
-                    'note': '最新资金费率缓存数据'
-                }
-                
-                os.makedirs("cache", exist_ok=True)
-                cache_file = "cache/latest_funding_rates.json"
-                with open(cache_file, 'w', encoding='utf-8') as f:
-                    json.dump(cache_data, f, ensure_ascii=False, indent=2)
-                
-                print(f"💾 最新资金费率数据已保存到缓存: {cache_file}")
-                
-            except Exception as e:
-                print(f"⚠️ 保存缓存失败: {e}")
-        except Exception as e:
-            print(f"⚠️ 保存缓存失败: {e}")
+        # 不再保存到单独的latest_funding_rates.json文件
+        # 数据已经合并到all_funding_contracts_full.json中
+        print(f"💾 最新资金费率数据已合并到全量缓存文件中")
         
         return {
             "status": "success",
