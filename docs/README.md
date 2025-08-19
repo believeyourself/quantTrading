@@ -1,12 +1,34 @@
-# 量化交易系统文档
+# 加密货币资金费率监控系统
 
-## 项目结构
+一个专注于监控多结算周期资金费率结算合约的系统，支持备选合约管理和入池出池监控。
+
+## 功能特性
+
+### 📊 资金费率监控
+- **多结算周期监控**：支持1h、2h、4h、8h等不同结算周期的合约监控
+- **智能缓存系统**：使用统一缓存文件，按结算周期分组存储，避免重复扫描
+- **多交易所支持**：支持Binance、OKX、Bybit等主流交易所
+- **费率阈值告警**：当资金费率超过设定阈值时触发通知
+
+### 🔄 合约池管理
+- **多结算周期合约管理**：支持不同结算周期的备选合约管理
+- **智能缓存更新**：自动更新各结算周期的合约缓存，支持增量更新
+- **备选合约管理**：维护备选合约列表
+- **入池出池监控**：监控合约根据资金费率变化进出池子的状态
+- **成交量过滤**：基于24小时成交量设置过滤条件
+
+### 📬 实时通知
+- **Telegram推送**：通过Telegram实时推送合约进出池子通知
+- **日志记录**：详细记录监控活动和状态变化
+
+## 系统架构
 
 ```
 quantTrading/
 ├── config/                 # 配置模块
 │   ├── __init__.py
-│   └── settings.py        # 系统配置
+│   ├── settings.py        # 系统配置
+│   └── proxy_settings.py  # 代理设置
 ├── data/                  # 数据管理模块
 │   ├── __init__.py
 │   ├── manager.py         # 数据管理器
@@ -15,18 +37,7 @@ quantTrading/
 │   ├── __init__.py
 │   ├── base.py           # 策略基类
 │   ├── factory.py        # 策略工厂
-│   ├── ma_cross.py       # 移动平均线策略
-│   ├── bollinger_bands.py # 布林带策略
-│   ├── macd.py           # MACD策略
-│   └── rsi.py            # RSI策略
-├── backtest/             # 回测模块
-│   ├── __init__.py
-│   ├── engine.py         # 回测引擎
-│   └── manager.py        # 回测管理器
-├── trading/              # 交易模块
-│   ├── __init__.py
-│   ├── engine.py         # 交易引擎
-│   └── manager.py        # 交易管理器
+│   └── funding_rate_arbitrage.py # 资金费率监控策略
 ├── api/                  # API模块
 │   ├── __init__.py
 │   └── routes.py         # API路由
@@ -36,136 +47,147 @@ quantTrading/
 ├── utils/                # 工具模块
 │   ├── __init__.py
 │   ├── database.py       # 数据库工具
-│   └── models.py         # 数据模型
-├── tests/                # 测试模块
-│   ├── __init__.py
-│   └── system_test.py    # 系统测试
+│   ├── models.py         # 数据模型
+│   ├── binance_funding.py # Binance资金费率工具
+│   └── notifier.py       # 通知工具
+├── cache/                # 缓存目录
 ├── logs/                 # 日志目录
 ├── docs/                 # 文档目录
 ├── main.py               # 主程序
-├── start_web.py          # Web启动脚本
+├── start.py              # 统一启动脚本
 ├── requirements.txt      # 依赖包
 ├── env_example.txt       # 环境变量示例
 └── README.md            # 项目说明
 ```
 
-## 模块说明
+## 安装部署
 
-### config/ - 配置模块
-- `settings.py`: 系统配置，包含数据库、API、交易等配置参数
+### 1. 环境要求
+- Python 3.8+
+- SQLite数据库
+- 网络连接（用于获取市场数据）
 
-### data/ - 数据管理模块
-- `manager.py`: 数据管理器，负责获取和管理市场数据
-- `models.py`: 数据模型，定义市场数据结构
-
-### strategies/ - 策略模块
-- `base.py`: 策略基类，定义策略接口
-- `factory.py`: 策略工厂，用于创建策略实例
-- `ma_cross.py`: 移动平均线交叉策略
-- `bollinger_bands.py`: 布林带策略
-- `macd.py`: MACD策略
-- `rsi.py`: RSI策略
-
-### backtest/ - 回测模块
-- `engine.py`: 回测引擎，执行历史数据回测
-- `manager.py`: 回测管理器，管理回测任务
-
-### trading/ - 交易模块
-- `engine.py`: 交易引擎，执行模拟和实盘交易
-- `manager.py`: 交易管理器，管理交易引擎
-
-### api/ - API模块
-- `routes.py`: REST API路由，提供HTTP接口
-
-### web/ - Web界面模块
-- `interface.py`: Dash Web界面，提供可视化界面
-
-### utils/ - 工具模块
-- `database.py`: 数据库工具，提供数据库连接和操作
-- `models.py`: 数据模型，定义数据库表结构
-
-### tests/ - 测试模块
-- `system_test.py`: 系统测试，验证各模块功能
-
-## 使用指南
-
-### 1. 安装依赖
+### 2. 安装依赖
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. 配置环境
+### 3. 配置环境变量
+复制 `env_example.txt` 为 `.env` 并修改配置：
 ```bash
 cp env_example.txt .env
-# 编辑.env文件
 ```
 
-### 3. 运行测试
-```bash
-python -m tests.system_test
-```
+主要配置项：
+- `TELEGRAM_TOKEN`: Telegram机器人token（用于通知）
+- `TELEGRAM_CHAT_ID`: Telegram聊天ID
 
 ### 4. 启动系统
+
+#### 使用统一启动脚本（推荐）
 ```bash
-# 启动API服务
+# 交互式菜单
+python start.py
+
+# 命令行模式
+python start.py web      # 启动Web界面
+python start.py api      # 启动API服务
+python start.py main     # 启动主程序
+python start.py all      # 启动所有服务
+```
+
+#### 直接启动
+```bash
+# 启动主程序（监控系统）
 python main.py
 
 # 启动Web界面
-python start_web.py
+python start.py web
+
+# 启动API服务
+python start.py api
 ```
+
+**访问地址**：
+- Web界面：http://localhost:8050
+- API服务：http://localhost:8000
+
+## 使用指南
+
+### 1. 资金费率监控策略
+
+**配置说明**：
+- 自动监控多个交易所的永续合约资金费率
+- 当资金费率绝对值 ≥ 0.5% 时，将合约加入待选池
+- 当资金费率绝对值 < 0.5% 时，将合约移出待选池
+- 通过Telegram实时推送合约进出池子的通知
+- 支持设置最大池子大小和最小成交量过滤
+- 每小时自动刷新合约池
+
+**使用示例**：
+```python
+from strategies.factory import StrategyFactory
+
+# 创建资金费率监控策略
+strategy = StrategyFactory.create_strategy("funding_rate_arbitrage", {
+    "funding_rate_threshold": 0.005,  # 0.5%
+    "contract_refresh_interval": 60,  # 60分钟
+    "funding_rate_check_interval": 60,  # 60秒
+    "max_pool_size": 20,
+    "min_volume": 1000000,
+    "exchanges": ["binance", "okx", "bybit"]
+})
+
+# 启动监控
+strategy.start_monitoring()
+
+# 查看池子状态
+pool_status = strategy.get_pool_status()
+print(f"当前池子有 {pool_status['pool_size']} 个合约")
+```
+
+### 2. Web界面
+
+访问 `http://localhost:8050` 使用Web界面：
+
+- **监控面板**：查看当前监控的合约和资金费率
+- **池子状态**：查看当前在池合约和历史变动
+- **配置管理**：修改监控参数和通知设置
+- **日志查看**：查看系统运行日志
+
+## 配置说明
+
+### 监控参数
+
+```json
+{
+    "funding_rate_threshold": 0.005,    // 资金费率阈值 (0.5%)
+    "contract_refresh_interval": 60,    // 合约池刷新间隔(分钟)
+    "funding_rate_check_interval": 60,  // 资金费率检测间隔(秒)
+    "max_pool_size": 20,                // 最大池子大小
+    "min_volume": 1000000,              // 最小24小时成交量
+    "exchanges": ["binance", "okx", "bybit"]  // 支持的交易所
+}
+```
+
+### 通知配置
+
+- `TELEGRAM_ENABLED`: 是否启用Telegram通知
+- `TELEGRAM_TOKEN`: Telegram机器人token
+- `TELEGRAM_CHAT_ID`: Telegram聊天ID
+- `LOG_LEVEL`: 日志级别（DEBUG/INFO/WARNING/ERROR）
 
 ## 开发指南
 
-### 添加新策略
-1. 在`strategies/`目录下创建新策略文件
-2. 继承`BaseStrategy`类
-3. 实现`generate_signals`方法
-4. 在`factory.py`中注册新策略
+### 添加新功能
 
-### 扩展数据源
-1. 在`data/manager.py`中添加新数据源
-2. 实现数据获取和格式转换
-3. 更新配置选项
+1. 在相应模块中实现新功能
+2. 更新配置文件和环境变量
+3. 编写测试用例
+4. 更新文档
 
-### 添加新API接口
-1. 在`api/routes.py`中添加新路由
-2. 定义请求和响应模型
-3. 实现业务逻辑
+### 代码结构说明
 
-## 部署说明
-
-### 生产环境部署
-1. 使用生产级数据库（PostgreSQL/MySQL）
-2. 配置反向代理（Nginx）
-3. 使用进程管理器（PM2/Supervisor）
-4. 配置SSL证书
-5. 设置防火墙规则
-
-### 监控和日志
-1. 配置日志轮转
-2. 设置监控告警
-3. 定期备份数据
-4. 性能监控
-
-## 故障排除
-
-### 常见问题
-1. 数据获取失败：检查网络连接和数据源配置
-2. 回测异常：验证策略参数和历史数据
-3. 交易失败：检查API密钥和账户余额
-
-### 日志查看
-```bash
-tail -f logs/quant_trading.log
-```
-
-## 贡献指南
-
-1. Fork项目
-2. 创建功能分支
-3. 提交更改
-4. 发起Pull Request
-
-## 许可证
-
-MIT License 
+- **策略模块**：所有交易策略都在 `strategies/` 目录下
+- **工具模块**：通用工具函数在 `utils/` 目录下
+- **配置管理**：系统配置在 `config/` 目录下

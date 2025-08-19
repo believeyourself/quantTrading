@@ -70,10 +70,7 @@ class BinanceFunding:
                     'raw': data
                 }
                 
-                # 格式化日志输出
-                rate_percent = funding_rate * 100
-                direction = "多头" if rate_percent > 0 else "空头" if rate_percent < 0 else "中性"
-                print(f"    📊 {symbol}: API调用成功 | 费率: {rate_percent:+.4f}% ({direction}) | 价格: ${mark_price:.4f}")
+
                 
                 return result
             else:
@@ -267,7 +264,6 @@ class BinanceFunding:
                     
                     # 限流控制
                     if (i + 1) % 50 == 0:
-                        print(f"    进度: {i + 1}/{len(perpetual_symbols)}")
                         time.sleep(1)
                     else:
                         time.sleep(0.1)
@@ -331,8 +327,6 @@ class BinanceFunding:
                             "data_source": "error_fallback"
                         }
             
-            print(f"📊 获取到 {len(latest_rates)} 个合约的最新资金费率")
-            
             # 保存全量缓存文件（包含最新资金费率）
             cache_data = {
                 'cache_time': datetime.now().isoformat(),
@@ -346,10 +340,7 @@ class BinanceFunding:
             with open(cache_file, 'w', encoding='utf-8') as f:
                 json.dump(cache_data, f, ensure_ascii=False, indent=2)
             
-            print(f"✅ 所有结算周期合约扫描完成")
-            for interval_key, contracts in contracts_by_interval.items():
-                print(f"  {interval_key}: {len(contracts)}个合约")
-            print(f"💾 全量缓存已保存到 {cache_file}")
+            print(f"✅ 扫描完成，共 {len(perpetual_symbols)} 个合约，{len(contracts_by_interval)} 个结算周期")
             
             return contracts_by_interval
             
@@ -376,13 +367,9 @@ class BinanceFunding:
                 cache_time = datetime.fromisoformat(cache_data.get('cache_time', '2000-01-01'))
                 cache_age = (datetime.now() - cache_time).total_seconds()
                 
-                print(f"📋 全量缓存时间: {cache_age:.0f}秒前")
-                
                 # 从全量缓存中获取指定结算周期的合约
                 contracts_by_interval = cache_data.get('contracts_by_interval', {})
                 target_contracts = contracts_by_interval.get(interval, {})
-                
-                print(f"📊 {interval}结算周期合约: {len(target_contracts)}个")
                 
                 # 检查缓存是否过期
                 if cache_age > cache_duration:

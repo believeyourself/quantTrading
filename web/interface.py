@@ -18,23 +18,43 @@ app.title = "加密货币资金费率监控系统"
 def load_cached_data(interval="1h"):
     """直接加载本地缓存数据，优先读取最新资金费率缓存"""
     try:
-        print(f"📋 开始加载本地缓存数据，结算周期: {interval}")
+        print(f"📋 加载本地缓存数据，结算周期: {interval}")
         
-        # 不再需要单独读取最新资金费率缓存，直接从合并后的全量缓存读取
-        print("📋 使用合并后的全量缓存文件")
-        
-        # 直接读取监控合约缓存文件
+        # 从统一缓存文件读取监控合约数据
         pool_contracts = []
         try:
-            with open("cache/funding_rate_contracts.json", 'r', encoding='utf-8') as f:
-                pool_data = json.load(f)
-                if 'contracts' in pool_data:
-                    contracts = pool_data.get('contracts', {})
-                else:
-                    contracts = pool_data
+            with open("cache/all_funding_contracts_full.json", 'r', encoding='utf-8') as f:
+                cache_data = json.load(f)
+                
+                # 直接从缓存中获取监控合约池
+                monitor_pool = cache_data.get('monitor_pool', {})
+                
+                # 如果没有监控合约池，则进行筛选（向后兼容）
+                if not monitor_pool:
+                    try:
+                        from config.settings import settings
+                        threshold = settings.FUNDING_RATE_THRESHOLD
+                        min_volume = settings.MIN_VOLUME
+                    except ImportError:
+                        threshold = 0.005  # 0.5% 默认值
+                        min_volume = 1000000  # 100万USDT 默认值
+                    
+                    # 筛选符合条件的合约
+                    contracts_by_interval = cache_data.get('contracts_by_interval', {})
+                    for interval, contracts in contracts_by_interval.items():
+                        for symbol, info in contracts.items():
+                            try:
+                                funding_rate = abs(float(info.get('current_funding_rate', 0)))
+                                volume_24h = float(info.get('volume_24h', 0))
+                                
+                                if funding_rate >= threshold and volume_24h >= min_volume:
+                                    monitor_pool[symbol] = info
+                            except (ValueError, TypeError) as e:
+                                print(f"⚠️ 处理监控合约 {symbol} 时出错: {e}")
+                                continue
                 
                 # 转换为列表格式
-                for symbol, info in contracts.items():
+                for symbol, info in monitor_pool.items():
                     try:
                         pool_contracts.append({
                             "symbol": symbol,
@@ -48,11 +68,11 @@ def load_cached_data(interval="1h"):
                         print(f"⚠️ 处理监控合约 {symbol} 时出错: {e}")
                         continue
                 
-                print(f"📋 从本地缓存加载了 {len(pool_contracts)} 个监控合约")
+                print(f"📋 加载了 {len(pool_contracts)} 个监控合约")
         except FileNotFoundError:
-            print("📋 监控合约缓存文件不存在")
+            print("📋 统一缓存文件不存在")
         except Exception as e:
-            print(f"⚠️ 读取监控合约缓存失败: {e}")
+            print(f"⚠️ 读取统一缓存失败: {e}")
 
         # 从合并后的全量缓存文件中读取数据
         candidates = {}
@@ -74,9 +94,7 @@ def load_cached_data(interval="1h"):
                         funding_interval = info.get('funding_interval')
                         if funding_interval == interval:
                             candidates[symbol] = info
-                            print(f"    ✅ {symbol}: {funding_interval} -> {interval}")
-                        else:
-                            print(f"    ⚠️ {symbol}: {funding_interval} != {interval} (跳过)")
+                        # 删除详细的筛选日志
                     
                     # 使用最新缓存时间
                     cache_time = cache_data.get('cache_time', '')
@@ -98,7 +116,6 @@ def load_cached_data(interval="1h"):
                             update_time = cache_time
                     
                     print(f"📋 筛选出 {len(candidates)} 个{interval}结算周期合约")
-                    print(f"📅 缓存时间: {update_time}")
                 
                 # 如果没有找到合约，则从contracts_by_interval中获取
                 if not candidates:
@@ -126,13 +143,11 @@ def load_cached_data(interval="1h"):
                             update_time = cache_time
                     
                     print(f"📋 从基础合约数据加载了 {len(candidates)} 个{interval}结算周期合约")
-                    print(f"📅 缓存时间: {update_time}")
             else:
                 print(f"📋 全量缓存文件不存在: {cache_file}")
         except Exception as e:
             print(f"⚠️ 读取全量缓存失败: {e}")
         
-        print("🔧 开始构建表格...")
         result = build_tables(pool_contracts, candidates, interval, update_time)
         print("✅ 本地缓存数据加载完成")
         return result, update_time
@@ -238,7 +253,7 @@ def unified_notification_callback(refresh_pool_clicks):
 )
 def initialize_page(data):
     """页面初始化时只加载缓存数据，不主动更新"""
-    print(f"🚀 页面初始化 - 加载缓存数据")
+
     result, update_time = load_cached_data("1h")  # 默认加载1小时结算周期
     pool_table, candidates_table = result
     count_text = "当前显示: 1h结算周期合约"
@@ -255,7 +270,6 @@ def initialize_page(data):
 )
 def filter_by_interval(interval):
     """根据结算周期筛选合约数据"""
-    print(f"🔄 切换结算周期: {interval}")
     result, update_time = load_cached_data(interval)
     pool_table, candidates_table = result
     count_text = f"当前显示: {interval}结算周期合约"
@@ -276,15 +290,11 @@ def update_candidates_data(refresh_clicks, current_interval):
     try:
         # 使用当前选中的结算周期，如果没有选中则默认使用1h
         interval = current_interval if current_interval else "1h"
-        print(f"🔄 刷新按钮点击 - 重新加载本地缓存数据，结算周期: {interval}")
-        
         # 直接调用load_cached_data函数，它会读取本地缓存
         result, update_time = load_cached_data(interval)
         pool_table, candidates_table = result
         count_text = f"当前显示: {interval}结算周期合约"
         
-        print("✅ 本地缓存数据刷新完成")
-        print("🔄 表格数据已刷新，历史按钮功能正常")
         return pool_table, candidates_table, count_text, update_time
         
     except Exception as e:
@@ -297,7 +307,7 @@ def update_candidates_data(refresh_clicks, current_interval):
 def build_tables(pool_contracts, candidates, interval="1h", update_time="未知"):
     """构建表格组件"""
     try:
-        print(f"🔧 开始构建表格，监控合约: {len(pool_contracts)}, 备选合约: {len(candidates)}, 结算周期: {interval}")
+
         
         def format_time(timestamp):
             """格式化时间戳为北京时间"""
@@ -332,7 +342,6 @@ def build_tables(pool_contracts, candidates, interval="1h", update_time="未知"
         
         # 构建当前监控合约表格
         if pool_contracts and len(pool_contracts) > 0:
-            print(f"🔧 构建监控合约表格，共 {len(pool_contracts)} 个合约")
             pool_table_header = [html.Thead(html.Tr([
                 html.Th("合约名称"), 
                 html.Th("交易所"), 
@@ -374,14 +383,11 @@ def build_tables(pool_contracts, candidates, interval="1h", update_time="未知"
                     print(f"⚠️ 处理监控合约 {contract.get('symbol', '')} 时出错: {e}")
                     continue
             pool_table = dbc.Table(pool_table_header + [html.Tbody(pool_table_rows)], bordered=True, hover=True)
-            print(f"✅ 监控合约表格构建完成，共 {len(pool_table_rows)} 行")
         else:
             pool_table = html.P("暂无监控合约数据")
-            print("⚠️ 没有监控合约数据")
 
         # 构建所有备选合约表格
         if candidates and len(candidates) > 0:
-            print(f"🔧 构建备选合约表格，共 {len(candidates)} 个合约")
             
             # 创建可排序的资金费率列标题
             funding_rate_header = html.Th([
@@ -467,27 +473,18 @@ def build_tables(pool_contracts, candidates, interval="1h", update_time="未知"
 )
 def open_history_modal(n_clicks, is_open):
     ctx = callback_context
-    print(f"🔍 查看历史回调被触发")
-    print(f"   n_clicks: {n_clicks}")
-    print(f"   is_open: {is_open}")
-    print(f"   ctx.triggered: {ctx.triggered}")
     
     if not ctx.triggered:
-        print("   ⚠️ 没有触发上下文")
         return False, "", {}, ""
 
     triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
-    print(f"   triggered_id: {triggered_id}")
     
     # 检查是否真的是历史按钮被点击
-    # 按钮ID可能是 {"index":"SYMBOL","type":"view-history"} 或 {"type":"view-history","index":"SYMBOL"}
     if not ('"type":"view-history"' in triggered_id and '"index":' in triggered_id):
-        print(f"   ❌ 不是历史按钮的触发: {triggered_id}")
         return False, "", {}, ""
     
     # 检查是否有实际的点击事件
     if not any(n_clicks):
-        print(f"   ❌ 没有检测到点击事件")
         return False, "", {}, ""
     
     # 找到被点击的按钮索引
@@ -498,21 +495,14 @@ def open_history_modal(n_clicks, is_open):
             break
     
     if clicked_index is None:
-        print(f"   ❌ 无法确定哪个按钮被点击")
         return False, "", {}, ""
-    
-    print(f"   ✅ 确认是历史按钮触发")
-    print(f"   🔄 按钮ID: {triggered_id}")
-    print(f"   🔄 点击的按钮索引: {clicked_index}")
     
     try:
         # 解析symbol - 支持两种ID格式
         parsed_id = json.loads(triggered_id)
         symbol = parsed_id.get('index') or parsed_id.get('symbol')
         if not symbol:
-            print(f"   ❌ 无法从ID中解析symbol: {triggered_id}")
             return False, "", {}, ""
-        print(f"🔄 查看历史按钮被点击，合约: {symbol}")
         
         # 调用API获取历史数据
         resp = requests.get(f"{API_BASE_URL}/funding_rates?symbol={symbol}")
@@ -523,8 +513,6 @@ def open_history_modal(n_clicks, is_open):
 
         data = resp.json()
         funding_rates = data.get("funding_rate", [])
-        
-        print(f"📊 获取到 {len(funding_rates)} 条历史记录")
 
         if not funding_rates:
             return not is_open, f"{symbol} 历史资金费率", {}, "暂无历史数据"
@@ -621,16 +609,12 @@ def get_latest_funding_rates(latest_rates_clicks, current_interval):
     interval = current_interval if current_interval else "1h"
     
     try:
-        print(f"🔄 Web界面: 开始获取最新资金费率，结算周期: {interval}...")
-        
         # 调用获取最新资金费率的API（这会更新缓存）
         latest_resp = requests.get(f"{API_BASE_URL}/funding_monitor/latest-rates")
         if latest_resp.status_code != 200:
             error_msg = f"获取最新资金费率失败: {latest_resp.text}"
             print(f"❌ Web界面: {error_msg}")
             return error_msg, True
-        
-        print(f"✅ Web界面: API调用成功，缓存已更新")
         
         # 从合并后的全量缓存文件读取数据以获取统计信息
         all_cache_file = "cache/all_funding_contracts_full.json"
@@ -652,9 +636,6 @@ def get_latest_funding_rates(latest_rates_clicks, current_interval):
                     else:
                         cached_count += 1
                 
-                print(f"📋 Web界面: 从合并缓存读取到 {len(latest_contracts)} 个合约数据")
-                print(f"📊 Web界面: 实时数据: {real_time_count}, 缓存数据: {cached_count}")
-                
                 # 检查资金费率并发送通知（统一通知逻辑）
                 try:
                     from utils.funding_rate_utils import FundingRateUtils
@@ -670,17 +651,10 @@ def get_latest_funding_rates(latest_rates_clicks, current_interval):
                         "Web界面"
                     )
                     
-                    # 输出所有消息
-                    for msg in messages:
-                        print(f"    {msg}")
-                    
                     if warning_count > 0:
                         print(f"📢 Web界面: 发送了 {warning_count} 个资金费率警告通知")
-                    else:
-                        print(f"✅ Web界面: 所有合约资金费率都在正常范围内")
                         
                 except ImportError:
-                    print("⚠️ Web界面: 无法导入工具类，跳过资金费率检查")
                     warning_count = 0
                 except Exception as e:
                     print(f"❌ Web界面: 资金费率检查失败: {e}")
@@ -691,8 +665,6 @@ def get_latest_funding_rates(latest_rates_clicks, current_interval):
                 if warning_count > 0:
                     notification_msg += f" | 📢 发现 {warning_count} 个高资金费率合约，已发送通知"
                 
-                print(f"📊 Web界面: 缓存更新完成，共 {len(latest_contracts)} 个合约，实时数据: {real_time_count}, 缓存数据: {cached_count}")
-                
                 # 只返回通知消息，不改变表格内容
                 return notification_msg, True
                 
@@ -701,7 +673,6 @@ def get_latest_funding_rates(latest_rates_clicks, current_interval):
                 print(f"❌ Web界面: {error_msg}")
                 return error_msg, True
         else:
-            print("⚠️ Web界面: 合并缓存文件不存在")
             return "⚠️ 合并缓存文件不存在", True
             
     except Exception as e:
@@ -754,7 +725,7 @@ def refresh_candidates_pool(refresh_pool_clicks, current_interval):
         
         notification_msg = f"✅ 备选池刷新成功！{interval}结算周期合约数据已更新"
         
-        print("✅ 页面数据更新完成")
+
         return pool_table, candidates_table, count_text, update_time, notification_msg, True
         
     except Exception as e:
@@ -786,16 +757,13 @@ def sort_candidates_by_funding_rate(asc_clicks, desc_clicks, current_interval):
         sort_asc = False
         if ctx.triggered[0]['prop_id'] == 'sort-funding-rate-asc.n_clicks':
             sort_asc = True
-            print("🔄 按资金费率升序排列")
         elif ctx.triggered[0]['prop_id'] == 'sort-funding-rate-desc.n_clicks':
             sort_asc = False
-            print("🔄 按资金费率降序排列")
         else:
             return dash.no_update, dash.no_update
         
         # 使用当前选中的结算周期
         interval = current_interval if current_interval else "1h"
-        print(f"🔄 排序结算周期: {interval}")
         
         # 从全量缓存文件读取原始数据
         try:
@@ -816,7 +784,7 @@ def sort_candidates_by_funding_rate(asc_clicks, desc_clicks, current_interval):
                 print(f"❌ {error_msg}")
                 return dash.no_update, f"当前显示: {interval}结算周期合约 (排序失败: {error_msg})"
             
-            print(f"📊 从缓存读取到 {len(candidates)} 个合约数据")
+
             
             # 将字典转换为列表并排序
             candidates_list = []
@@ -842,7 +810,7 @@ def sort_candidates_by_funding_rate(asc_clicks, desc_clicks, current_interval):
             # 按资金费率排序
             candidates_list.sort(key=lambda x: x['funding_rate'], reverse=not sort_asc)
             
-            print(f"✅ 排序完成，共 {len(candidates_list)} 个合约")
+
             
             # 重新构建表格
             def format_time(timestamp):
@@ -903,19 +871,16 @@ def sort_candidates_by_funding_rate(asc_clicks, desc_clicks, current_interval):
                 cache_time = cache_data.get('cache_time', '')
                 if cache_time:
                     try:
-                        # 解析缓存时间并格式化为北京时间
+                        # 解析缓存时间（缓存文件中的时间是本地时间，不需要时区转换）
                         if 'T' in cache_time:
-                            # ISO格式时间
-                            dt = datetime.fromisoformat(cache_time.replace('Z', '+00:00'))
+                            # ISO格式时间，直接解析为本地时间
+                            dt = datetime.fromisoformat(cache_time)
                         else:
                             # 其他格式，尝试解析
                             dt = datetime.strptime(cache_time, '%Y-%m-%d %H:%M:%S')
                         
-                        # 转换为北京时间
-                        if dt.tzinfo is None:
-                            dt = dt.replace(tzinfo=timezone.utc)
-                        beijing_time = dt.astimezone(timezone(timedelta(hours=8)))
-                        update_time = beijing_time.strftime('%Y-%m-%d %H:%M:%S')
+                        # 直接使用本地时间，不需要时区转换
+                        update_time = dt.strftime('%Y-%m-%d %H:%M:%S')
                     except Exception as e:
                         print(f"⚠️ 解析缓存时间失败: {e}")
                         update_time = cache_time

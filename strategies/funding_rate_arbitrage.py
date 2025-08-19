@@ -48,7 +48,7 @@ class FundingRateMonitor(BaseStrategy):
         self.candidate_contracts: Dict[str, Dict] = {}  # 备选合约
         self.cached_contracts = {}  # 缓存的合约信息
         self.last_update_time = None
-        self.cache_file = "cache/funding_rate_contracts.json"
+        self.cache_file = "cache/all_funding_contracts_full.json"
         self._updating = False
         self._update_lock = threading.Lock()
         self.funding = BinanceFunding()
@@ -67,30 +67,56 @@ class FundingRateMonitor(BaseStrategy):
         if load_on_startup and os.path.exists(self.cache_file):
             try:
                 with open(self.cache_file, 'r', encoding='utf-8') as f:
-                    self.cached_contracts = json.load(f)
+                    cache_data = json.load(f)
                 
-                # 调试信息：检查缓存内容
-                if self.cached_contracts:
-                    print(f"📋 缓存文件内容: {list(self.cached_contracts.keys())[:5]}...")
-                    # 检查是否包含正确的合约数据
-                    sample_key = list(self.cached_contracts.keys())[0]
-                    if isinstance(self.cached_contracts[sample_key], dict) and 'symbol' in self.cached_contracts[sample_key]:
-                        print(f"✅ 缓存数据结构正确，包含合约信息")
-                    else:
-                        print(f"⚠️ 缓存数据结构异常，可能包含字段名而非合约数据")
-                        print(f"   样本数据: {self.cached_contracts[sample_key]}")
-                        # 清空异常缓存
-                        self.cached_contracts = {}
-                        self.contract_pool = set()
-                        print("🔄 已清空异常缓存数据")
-                        return
+                # 优先从监控合约池加载合约
+                monitor_pool = cache_data.get('monitor_pool', {})
+                if monitor_pool:
+                    # 如果有监控合约池，直接使用
+                    self.cached_contracts = monitor_pool
+                    self.contract_pool = set(monitor_pool.keys())
+                    print(f"📋 从监控合约池加载了 {len(self.contract_pool)} 个合约")
+                else:
+                    # 如果没有监控合约池，则从所有合约中筛选符合条件的
+                    try:
+                        from config.settings import settings
+                        threshold = settings.FUNDING_RATE_THRESHOLD
+                        min_volume = settings.MIN_VOLUME
+                    except ImportError:
+                        threshold = 0.005  # 0.5% 默认值
+                        min_volume = 1000000  # 100万USDT 默认值
+                    
+                    # 筛选符合条件的合约
+                    contracts_by_interval = cache_data.get('contracts_by_interval', {})
+                    filtered_contracts = {}
+                    
+                    for interval, contracts in contracts_by_interval.items():
+                        for symbol, info in contracts.items():
+                            try:
+                                funding_rate = abs(float(info.get('current_funding_rate', 0)))
+                                volume_24h = float(info.get('volume_24h', 0))
+                                
+                                if funding_rate >= threshold and volume_24h >= min_volume:
+                                    filtered_contracts[symbol] = info
+                            except (ValueError, TypeError):
+                                continue
+                    
+                    # 只选择前N个合约
+                    sorted_contracts = sorted(
+                        filtered_contracts.items(), 
+                        key=lambda x: abs(float(x[1]['current_funding_rate'])), 
+                        reverse=True
+                    )
+                    selected_contracts = dict(sorted_contracts[:self.parameters['max_contracts_in_pool']])
+                    
+                    self.cached_contracts = selected_contracts
+                    self.contract_pool = set(selected_contracts.keys())
+                    print(f"📋 从所有合约中筛选出 {len(self.contract_pool)} 个符合条件的合约")
                 
-                self.contract_pool = set(self.cached_contracts.keys())
                 self.last_update_time = datetime.now()
-                print(f"📋 从缓存加载了 {len(self.contract_pool)} 个合约")
                 
             except Exception as e:
-                print(f"❌ 加载缓存失败: {e}")
+                print(f"❌ 加载统一缓存失败: {e}")
                 self.cached_contracts = {}
                 self.contract_pool = set()
                 self.last_update_time = None
@@ -101,9 +127,9 @@ class FundingRateMonitor(BaseStrategy):
             print("🔄 清空合约池，准备重新检测")
 
     def _save_cache(self):
-        """保存缓存"""
-        with open(self.cache_file, 'w', encoding='utf-8') as f:
-            json.dump(self.cached_contracts, f, ensure_ascii=False, indent=2)
+        """保存缓存 - 现在使用统一缓存，不再单独保存"""
+        # 策略不再单独保存缓存，统一缓存由API维护
+        pass
 
     def _is_cache_valid(self) -> bool:
         """检查缓存是否有效"""
@@ -237,43 +263,49 @@ class FundingRateMonitor(BaseStrategy):
             removed_contracts = self.contract_pool - new_pool
             if removed_contracts:
                 print(f"🔻 出池合约: {', '.join(removed_contracts)}")
-                # 发送出池通知 - 包含合约详细信息
-                for symbol in removed_contracts:
-                    if symbol in self.cached_contracts:
-                        info = self.cached_contracts[symbol]
-                        funding_rate = info.get('current_funding_rate', 0)
-                        mark_price = info.get('mark_price', 0)
-                        volume_24h = info.get('volume_24h', 0)
-                        
-                        message = f"🔻 合约出池: {symbol}\n" \
-                                 f"资金费率: {funding_rate:.4%}\n" \
-                                 f"标记价格: ${mark_price:.4f}\n" \
-                                 f"24h成交量: {volume_24h:,.0f}"
-                        send_telegram_message(message)
-                    else:
-                        # 如果没有详细信息，发送简单通知
-                        send_telegram_message(f"🔻 合约出池: {symbol}")
+                # 只有在非首次刷新时才发送出池通知
+                if self.last_update_time and (datetime.now() - self.last_update_time).total_seconds() > 60:
+                    for symbol in removed_contracts:
+                        if symbol in self.cached_contracts:
+                            info = self.cached_contracts[symbol]
+                            funding_rate = info.get('current_funding_rate', 0)
+                            mark_price = info.get('mark_price', 0)
+                            volume_24h = info.get('volume_24h', 0)
+                            
+                            message = f"🔻 合约出池: {symbol}\n" \
+                                     f"资金费率: {funding_rate:.4%}\n" \
+                                     f"标记价格: ${mark_price:.4f}\n" \
+                                     f"24h成交量: {volume_24h:,.0f}"
+                            send_telegram_message(message)
+                        else:
+                            # 如果没有详细信息，发送简单通知
+                            send_telegram_message(f"🔻 合约出池: {symbol}")
+                else:
+                    print(f"⚠️ 首次刷新，跳过出池通知")
             
             # 入池合约
             added_contracts = new_pool - self.contract_pool
             if added_contracts:
                 print(f"🔺 入池合约: {', '.join(added_contracts)}")
-                # 发送入池通知 - 包含合约详细信息
-                for symbol in added_contracts:
-                    if symbol in selected_contracts:
-                        info = selected_contracts[symbol]
-                        funding_rate = info.get('current_funding_rate', 0)
-                        mark_price = info.get('mark_price', 0)
-                        volume_24h = info.get('volume_24h', 0)
-                        
-                        message = f"🔺 合约入池: {symbol}\n" \
-                                 f"资金费率: {funding_rate:.4%}\n" \
-                                 f"标记价格: ${mark_price:.4f}\n" \
-                                 f"24h成交量: {volume_24h:,.0f}"
-                        send_telegram_message(message)
-                    else:
-                        # 如果没有详细信息，发送简单通知
-                        send_telegram_message(f"🔺 合约入池: {symbol}")
+                # 只有在非首次刷新时才发送入池通知
+                if self.last_update_time and (datetime.now() - self.last_update_time).total_seconds() > 60:
+                    for symbol in added_contracts:
+                        if symbol in selected_contracts:
+                            info = selected_contracts[symbol]
+                            funding_rate = info.get('current_funding_rate', 0)
+                            mark_price = info.get('mark_price', 0)
+                            volume_24h = info.get('volume_24h', 0)
+                            
+                            message = f"🔺 合约入池: {symbol}\n" \
+                                     f"资金费率: {funding_rate:.4%}\n" \
+                                     f"标记价格: ${mark_price:.4f}\n" \
+                                     f"24h成交量: {volume_24h:,.0f}"
+                            send_telegram_message(message)
+                        else:
+                            # 如果没有详细信息，发送简单通知
+                            send_telegram_message(f"🔺 合约入池: {symbol}")
+                else:
+                    print(f"⚠️ 首次刷新，跳过入池通知")
             
             # 更新合约池和缓存
             self.contract_pool = new_pool

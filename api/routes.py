@@ -152,15 +152,11 @@ def get_funding_rates(symbol: Optional[str] = None, exchange: Optional[str] = No
 def refresh_funding_candidates():
     """刷新备选合约池 - 使用现成的币安API方法"""
     try:
-        print("🔄 开始刷新备选合约池...")
-        
         # 使用现成的方法获取币安数据
         from utils.binance_funding import get_all_funding_rates, get_all_24h_volumes
         
         try:
-            print("📡 正在从币安API获取最新资金费率数据...")
             funding_rates = get_all_funding_rates()
-            print(f"✅ 获取到 {len(funding_rates)} 个合约的资金费率")
         except Exception as e:
             error_msg = f"获取资金费率数据失败: {str(e)}"
             print(f"❌ {error_msg}")
@@ -168,9 +164,7 @@ def refresh_funding_candidates():
             raise HTTPException(status_code=500, detail=error_msg)
         
         try:
-            print("📡 正在从币安API获取最新成交量数据...")
             volumes = get_all_24h_volumes()
-            print(f"✅ 获取到 {len(volumes)} 个合约的成交量")
         except Exception as e:
             error_msg = f"获取成交量数据失败: {str(e)}"
             print(f"❌ {error_msg}")
@@ -217,9 +211,7 @@ def refresh_funding_candidates():
                         # 其他间隔，按小时四舍五入
                         funding_interval_hours = round(funding_interval_hours)
                     
-                    print(f"  📊 {symbol}: 检测到结算周期 {funding_interval_hours}h")
                 else:
-                    print(f"  ❌ {symbol}: 无法检测结算周期，跳过该合约")
                     continue  # 直接跳过无法检测结算周期的合约
                 
                 # 格式化下次结算时间为北京时间
@@ -262,55 +254,30 @@ def refresh_funding_candidates():
                 print(f"⚠️ 处理合约 {symbol} 时出错: {e}")
                 continue
         
-        # 保存到监控合约缓存
-        monitor_cache = {
-            'cache_time': datetime.now().isoformat(),
-            'contracts': filtered_contracts,
-            'count': len(filtered_contracts),
-            'threshold': threshold,
-            'min_volume': min_volume
-        }
+        # 不再单独保存监控合约缓存，所有数据都保存在统一缓存中
         
-        os.makedirs("cache", exist_ok=True)
-        with open("cache/funding_rate_contracts.json", 'w', encoding='utf-8') as f:
-            json.dump(monitor_cache, f, ensure_ascii=False, indent=2)
-        
-        # 为每个结算周期创建对应的缓存文件
+        # 统计结算周期和合约数量
         intervals_found = []
         total_contracts = 0
         
         for interval, contracts in contracts_by_interval.items():
-            if contracts:  # 只保存有合约的结算周期
+            if contracts:  # 只统计有合约的结算周期
                 intervals_found.append(interval)
                 total_contracts += len(contracts)
-                
-                # 保存到对应结算周期的缓存文件
-                interval_cache_data = {
-                    'cache_time': datetime.now().isoformat(),
-                    'contracts': contracts,
-                    'interval': interval,
-                    'contract_count': len(contracts)
-                }
-                
-                cache_filename = f"cache/{interval}_funding_contracts_full.json"
-                with open(cache_filename, 'w', encoding='utf-8') as f:
-                    json.dump(interval_cache_data, f, ensure_ascii=False, indent=2)
-                
-                print(f"📊 {interval}结算周期合约: {len(contracts)}个")
         
-        # 保存到主缓存
+        # 保存到统一的缓存文件
         main_cache_data = {
             'cache_time': datetime.now().isoformat(),
             'contracts_by_interval': contracts_by_interval,
             'total_scanned': len(funding_rates),
-            'intervals_found': intervals_found
+            'intervals_found': intervals_found,
+            'monitor_pool': filtered_contracts  # 添加监控合约池
         }
         
         with open("cache/all_funding_contracts_full.json", 'w', encoding='utf-8') as f:
             json.dump(main_cache_data, f, ensure_ascii=False, indent=2)
         
-        print(f"✅ 监控合约池更新完成，共 {len(filtered_contracts)} 个符合条件合约")
-        print(f"📊 总计: {total_contracts}个合约，结算周期: {', '.join(intervals_found)}")
+        print(f"✅ 监控合约池更新完成，共 {len(filtered_contracts)} 个符合条件合约，总计 {total_contracts} 个合约")
         
         # 发送Telegram通知
         try:
@@ -342,51 +309,60 @@ def refresh_funding_candidates():
 def get_funding_pool():
     """获取当前监控合约池"""
     try:
-        # 直接从缓存文件读取监控合约数据
-        cache_file = "cache/funding_rate_contracts.json"
+        # 从统一缓存文件读取数据
+        cache_file = "cache/all_funding_contracts_full.json"
         if os.path.exists(cache_file):
             with open(cache_file, 'r', encoding='utf-8') as f:
                 cached_data = json.load(f)
             
-            # 检查新的缓存格式
-            if 'contracts' in cached_data:
-                # 新格式：{"contracts": {...}, "count": ..., ...}
-                contracts = cached_data.get('contracts', {})
-            else:
-                # 旧格式：直接是合约数据
-                contracts = cached_data
+                    # 直接从缓存中获取监控合约池
+        monitor_pool = cached_data.get('monitor_pool', {})
+        
+        # 如果没有监控合约池，则进行筛选（向后兼容）
+        if not monitor_pool:
+            try:
+                from config.settings import settings
+                threshold = settings.FUNDING_RATE_THRESHOLD
+                min_volume = settings.MIN_VOLUME
+            except ImportError:
+                threshold = 0.005  # 0.5% 默认值
+                min_volume = 1000000  # 100万USDT 默认值
             
-            # 转换为列表格式，包含合约详细信息
-            contracts_list = []
-            for symbol, info in contracts.items():
-                try:
-                    contracts_list.append({
-                        "symbol": symbol,
-                        "exchange": info.get("exchange", "binance"),
-                        "funding_rate": float(info.get("current_funding_rate", 0)),
-                        "funding_time": info.get("next_funding_time", ""),
-                        "volume_24h": info.get("volume_24h", 0),
-                        "mark_price": info.get("mark_price", 0)
-                    })
-                except (ValueError, TypeError) as e:
-                    print(f"⚠️ 处理合约 {symbol} 时出错: {e}")
-                    continue
-            
-            print(f"📋 从缓存文件加载了 {len(contracts_list)} 个监控合约")
-            return {
-                "status": "success",
-                "contracts": contracts_list,
-                "count": len(contracts_list),
-                "timestamp": datetime.now().isoformat()
-            }
-        else:
-            print("📋 监控合约缓存文件不存在")
-            return {
-                "status": "success",
-                "contracts": [],
-                "count": 0,
-                "timestamp": datetime.now().isoformat()
-            }
+            # 筛选符合条件的合约
+            contracts_by_interval = cached_data.get('contracts_by_interval', {})
+            for interval, contracts in contracts_by_interval.items():
+                for symbol, info in contracts.items():
+                    try:
+                        funding_rate = abs(float(info.get('current_funding_rate', 0)))
+                        volume_24h = float(info.get('volume_24h', 0))
+                        
+                        if funding_rate >= threshold and volume_24h >= min_volume:
+                            monitor_pool[symbol] = info
+                    except (ValueError, TypeError):
+                        continue
+        
+        # 转换为列表格式
+        contracts_list = []
+        for symbol, info in monitor_pool.items():
+            try:
+                contracts_list.append({
+                    "symbol": symbol,
+                    "exchange": info.get("exchange", "binance"),
+                    "funding_rate": float(info.get("current_funding_rate", 0)),
+                    "funding_time": info.get("next_funding_time", ""),
+                    "volume_24h": info.get("volume_24h", 0),
+                    "mark_price": info.get("mark_price", 0)
+                })
+            except (ValueError, TypeError) as e:
+                print(f"⚠️ 处理合约 {symbol} 时出错: {e}")
+                continue
+        
+        return {
+            "status": "success",
+            "contracts": contracts_list,
+            "count": len(contracts_list),
+            "timestamp": datetime.now().isoformat()
+        }
 
     except Exception as e:
         print(f"获取合约池异常: {e}\n{traceback.format_exc()}")
@@ -396,21 +372,26 @@ def get_funding_pool():
 def get_funding_candidates():
     """获取备选合约池"""
     try:
-        # 直接从缓存文件读取备选合约数据
-        cache_file = "cache/funding_rate_contracts.json"
+        # 从统一缓存文件读取数据
+        cache_file = "cache/all_funding_contracts_full.json"
         if os.path.exists(cache_file):
             with open(cache_file, 'r', encoding='utf-8') as f:
                 cached_data = json.load(f)
             
-            print(f"📋 从缓存文件加载了 {len(cached_data)} 个备选合约")
+            # 从统一缓存中获取所有合约作为备选
+            all_contracts = {}
+            contracts_by_interval = cached_data.get('contracts_by_interval', {})
+            
+            for interval, contracts in contracts_by_interval.items():
+                all_contracts.update(contracts)
+            
             return {
                 "status": "success",
-                "contracts": cached_data,
-                "count": len(cached_data),
+                "contracts": all_contracts,
+                "count": len(all_contracts),
                 "timestamp": datetime.now().isoformat()
             }
         else:
-            print("📋 备选合约缓存文件不存在")
             return {
                 "status": "success",
                 "contracts": {},
@@ -632,19 +613,14 @@ def get_latest_funding_rates():
                 "timestamp": datetime.now().isoformat()
             }
         
-        print(f"📊 从缓存获取到 {len(all_contracts_data.get('contracts_by_interval', {}))} 个结算周期的合约数据")
-        
         # 获取最新资金费率
         latest_rates = {}
         real_time_count = 0
         cached_count = 0
         
         for interval, contracts in all_contracts_data['contracts_by_interval'].items():
-            print(f"\n🔍 处理 {interval} 结算周期合约，共 {len(contracts)} 个...")
-            
             for symbol in contracts.keys():
                 try:
-                    print(f"  📈 获取 {symbol} 最新资金费率...")
                     current_info = funding.get_current_funding(symbol, "UM")
                     
                     if current_info:
@@ -675,10 +651,7 @@ def get_latest_funding_rates():
                         }
                         real_time_count += 1
                         
-                        # 格式化资金费率显示
-                        rate_percent = funding_rate * 100
-                        direction = "多头" if funding_rate > 0 else "空头" if funding_rate < 0 else "中性"
-                        print(f"    ✅ {symbol}: {rate_percent:+.4f}% ({direction}) | 价格: ${mark_price:.4f} | 实时数据")
+
                         
                     else:
                         # 使用缓存数据
@@ -711,10 +684,7 @@ def get_latest_funding_rates():
                         }
                         cached_count += 1
                         
-                        # 格式化资金费率显示
-                        rate_percent = funding_rate * 100
-                        direction = "多头" if funding_rate > 0 else "空头" if funding_rate < 0 else "中性"
-                        print(f"    📋 {symbol}: {rate_percent:+.4f}% ({direction}) | 价格: ${mark_price:.4f} | 缓存数据")
+
                     
                     # 添加延迟避免API限流
                     time.sleep(0.1)
@@ -751,33 +721,11 @@ def get_latest_funding_rates():
                     }
                     cached_count += 1
                     
-                    # 格式化资金费率显示
-                    rate_percent = funding_rate * 100
-                    direction = "多头" if funding_rate > 0 else "空头" if funding_rate < 0 else "中性"
-                    print(f"    📋 {symbol}: {rate_percent:+.4f}% ({direction}) | 价格: ${mark_price:.4f} | 缓存数据(错误回退)")
-        
-        print(f"\n📊 资金费率获取完成:")
-        print(f"  📈 实时数据: {real_time_count} 个合约")
-        print(f"  📋 缓存数据: {cached_count} 个合约")
-        print(f"  📊 总计: {len(latest_rates)} 个合约")
-        
-        # 统计资金费率分布
-        positive_rates = [info['funding_rate'] for info in latest_rates.values() if info['funding_rate'] > 0]
-        negative_rates = [info['funding_rate'] for info in latest_rates.values() if info['funding_rate'] < 0]
-        zero_rates = [info['funding_rate'] for info in latest_rates.values() if info['funding_rate'] == 0]
-        
-        if positive_rates:
-            max_positive = max(positive_rates) * 100
-            print(f"  🟢 最高正费率: {max_positive:.4f}%")
-        if negative_rates:
-            min_negative = min(negative_rates) * 100
-            print(f"  🔴 最低负费率: {min_negative:.4f}%")
-        if zero_rates:
-            print(f"  ⚪ 零费率合约: {len(zero_rates)} 个")
+                    
+        print(f"📊 资金费率获取完成: 实时 {real_time_count} 个，缓存 {cached_count} 个，总计 {len(latest_rates)} 个")
         
         # 不再保存到单独的latest_funding_rates.json文件
         # 数据已经合并到all_funding_contracts_full.json中
-        print(f"💾 最新资金费率数据已合并到全量缓存文件中")
         
         return {
             "status": "success",
