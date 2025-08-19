@@ -23,8 +23,8 @@ class Settings(BaseSettings):
     MIN_VOLUME: float = 1000000            # 最小24小时成交量（USDT）
     CACHE_DURATION: int = 7200             # 缓存有效期（秒，2小时）
     UPDATE_INTERVAL: int = 1800            # 更新间隔（秒，30分钟）
-    CONTRACT_REFRESH_INTERVAL: int = 86400  # 合约池刷新间隔（秒，24小时）
-    FUNDING_RATE_CHECK_INTERVAL: int = 6000 # 资金费率检查间隔（秒，100分钟）
+    CONTRACT_REFRESH_INTERVAL: int = 10800  # 合约池刷新间隔（秒，3小时）
+    FUNDING_RATE_CHECK_INTERVAL: int = 600 # 资金费率检查间隔（秒，10分钟）
     
     # 交易所配置
     EXCHANGES: List[str] = ["binance", "okx", "bybit"]
