@@ -318,28 +318,16 @@ def get_funding_pool():
                     # 直接从缓存中获取监控合约池
         monitor_pool = cached_data.get('monitor_pool', {})
         
-        # 如果没有监控合约池，则进行筛选（向后兼容）
+        # 如果没有监控合约池，直接返回空结果
         if not monitor_pool:
-            try:
-                from config.settings import settings
-                threshold = settings.FUNDING_RATE_THRESHOLD
-                min_volume = settings.MIN_VOLUME
-            except ImportError:
-                threshold = 0.005  # 0.5% 默认值
-                min_volume = 1000000  # 100万USDT 默认值
-            
-            # 筛选符合条件的合约
-            contracts_by_interval = cached_data.get('contracts_by_interval', {})
-            for interval, contracts in contracts_by_interval.items():
-                for symbol, info in contracts.items():
-                    try:
-                        funding_rate = abs(float(info.get('current_funding_rate', 0)))
-                        volume_24h = float(info.get('volume_24h', 0))
-                        
-                        if funding_rate >= threshold and volume_24h >= min_volume:
-                            monitor_pool[symbol] = info
-                    except (ValueError, TypeError):
-                        continue
+            print("⚠️ 监控合约池为空，返回空结果")
+            return {
+                "status": "success",
+                "contracts": [],
+                "count": 0,
+                "timestamp": datetime.now().isoformat(),
+                "message": "监控合约池为空，请先刷新合约池"
+            }
         
         # 转换为列表格式
         contracts_list = []
@@ -724,8 +712,123 @@ def get_latest_funding_rates():
                     
         print(f"📊 资金费率获取完成: 实时 {real_time_count} 个，缓存 {cached_count} 个，总计 {len(latest_rates)} 个")
         
-        # 不再保存到单独的latest_funding_rates.json文件
-        # 数据已经合并到all_funding_contracts_full.json中
+        # 根据最新资金费率重新筛选符合条件的合约，更新监控池
+        try:
+            from config.settings import settings
+            threshold = settings.FUNDING_RATE_THRESHOLD
+            min_volume = settings.MIN_VOLUME
+        except ImportError:
+            threshold = 0.005  # 0.5% 默认值
+            min_volume = 1000000  # 100万USDT 默认值
+        
+        # 从缓存中获取成交量数据
+        volume_data = {}
+        try:
+            with open("cache/all_funding_contracts_full.json", 'r', encoding='utf-8') as f:
+                cache_data = json.load(f)
+                contracts_by_interval = cache_data.get('contracts_by_interval', {})
+                for interval, contracts in contracts_by_interval.items():
+                    for symbol, info in contracts.items():
+                        volume_data[symbol] = info.get('volume_24h', 0)
+        except Exception as e:
+            print(f"⚠️ 读取成交量数据失败: {e}")
+        
+        # 重新筛选符合条件的合约
+        new_monitor_pool = {}
+        for symbol, info in latest_rates.items():
+            try:
+                funding_rate = abs(float(info.get('funding_rate', 0)))
+                volume_24h = volume_data.get(symbol, 0)
+                
+                if funding_rate >= threshold and volume_24h >= min_volume:
+                    # 构建完整的合约信息
+                    new_monitor_pool[symbol] = {
+                        'symbol': symbol,
+                        'exchange': info.get('exchange', 'binance'),
+                        'current_funding_rate': info.get('funding_rate', 0),
+                        'next_funding_time': info.get('next_funding_time', ''),
+                        'funding_interval': info.get('funding_interval', ''),
+                        'mark_price': info.get('mark_price', 0),
+                        'index_price': info.get('index_price', 0),
+                        'volume_24h': volume_24h,
+                        'last_updated': info.get('last_updated', datetime.now().isoformat())
+                    }
+            except (ValueError, TypeError) as e:
+                print(f"⚠️ 筛选合约 {symbol} 时出错: {e}")
+                continue
+        
+        # 获取旧的监控池
+        old_monitor_pool = cache_data.get('monitor_pool', {})
+        
+        # 分析入池出池合约
+        old_symbols = set(old_monitor_pool.keys())
+        new_symbols = set(new_monitor_pool.keys())
+        
+        added_contracts = new_symbols - old_symbols
+        removed_contracts = old_symbols - new_symbols
+        
+        # 发送入池出池通知
+        if added_contracts or removed_contracts:
+            try:
+                from utils.notifier import send_telegram_message
+                
+                if added_contracts:
+                    print(f"🔺 入池合约: {', '.join(added_contracts)}")
+                    for symbol in added_contracts:
+                        if symbol in new_monitor_pool:
+                            info = new_monitor_pool[symbol]
+                            funding_rate = info.get('current_funding_rate', 0)
+                            mark_price = info.get('mark_price', 0)
+                            volume_24h = info.get('volume_24h', 0)
+                            
+                            message = f"🔺 合约入池: {symbol}\n" \
+                                     f"资金费率: {funding_rate:.4%}\n" \
+                                     f"标记价格: ${mark_price:.4f}\n" \
+                                     f"24h成交量: {volume_24h:,.0f}"
+                            send_telegram_message(message)
+                
+                if removed_contracts:
+                    print(f"🔻 出池合约: {', '.join(removed_contracts)}")
+                    for symbol in removed_contracts:
+                        if symbol in old_monitor_pool:
+                            info = old_monitor_pool[symbol]
+                            funding_rate = info.get('current_funding_rate', 0)
+                            mark_price = info.get('mark_price', 0)
+                            volume_24h = info.get('volume_24h', 0)
+                            
+                            message = f"🔻 合约出池: {symbol}\n" \
+                                     f"资金费率: {funding_rate:.4%}\n" \
+                                     f"标记价格: ${mark_price:.4f}\n" \
+                                     f"24h成交量: {volume_24h:,.0f}"
+                            send_telegram_message(message)
+                
+                print(f"📢 发送了 {len(added_contracts)} 个入池通知，{len(removed_contracts)} 个出池通知")
+                
+            except Exception as e:
+                print(f"⚠️ 发送Telegram通知失败: {e}")
+        
+        # 更新缓存文件，添加最新资金费率数据和新的监控池
+        updated_cache_data = {
+            'cache_time': datetime.now().isoformat(),
+            'contracts_by_interval': contracts_by_interval,
+            'latest_rates': latest_rates,
+            'monitor_pool': new_monitor_pool,
+            'total_scanned': len(latest_rates),
+            'intervals_found': list(contracts_by_interval.keys()),
+            'pool_update_time': datetime.now().isoformat(),
+            'pool_changes': {
+                'added': list(added_contracts),
+                'removed': list(removed_contracts),
+                'total_added': len(added_contracts),
+                'total_removed': len(removed_contracts)
+            }
+        }
+        
+        # 保存更新后的缓存
+        with open("cache/all_funding_contracts_full.json", 'w', encoding='utf-8') as f:
+            json.dump(updated_cache_data, f, ensure_ascii=False, indent=2)
+        
+        print(f"✅ 监控池更新完成: 新增 {len(added_contracts)} 个，移除 {len(removed_contracts)} 个，当前池内 {len(new_monitor_pool)} 个")
         
         return {
             "status": "success",
@@ -735,7 +838,14 @@ def get_latest_funding_rates():
             "cached_count": cached_count,
             "intervals": list(all_contracts_data.get('contracts_by_interval', {}).keys()),
             "timestamp": datetime.now().isoformat(),
-            "note": "包含最新实时资金费率数据，已保存到缓存"
+            "monitor_pool_updated": True,
+            "pool_changes": {
+                "added": list(added_contracts),
+                "removed": list(removed_contracts),
+                "total_added": len(added_contracts),
+                "total_removed": len(removed_contracts)
+            },
+            "note": "包含最新实时资金费率数据，监控池已更新，入池出池通知已发送"
         }
 
     except Exception as e:

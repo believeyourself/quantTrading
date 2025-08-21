@@ -29,29 +29,10 @@ def load_cached_data(interval="1h"):
                 # 直接从缓存中获取监控合约池
                 monitor_pool = cache_data.get('monitor_pool', {})
                 
-                # 如果没有监控合约池，则进行筛选（向后兼容）
+                # 如果没有监控合约池，直接使用空数据
                 if not monitor_pool:
-                    try:
-                        from config.settings import settings
-                        threshold = settings.FUNDING_RATE_THRESHOLD
-                        min_volume = settings.MIN_VOLUME
-                    except ImportError:
-                        threshold = 0.005  # 0.5% 默认值
-                        min_volume = 1000000  # 100万USDT 默认值
-                    
-                    # 筛选符合条件的合约
-                    contracts_by_interval = cache_data.get('contracts_by_interval', {})
-                    for interval, contracts in contracts_by_interval.items():
-                        for symbol, info in contracts.items():
-                            try:
-                                funding_rate = abs(float(info.get('current_funding_rate', 0)))
-                                volume_24h = float(info.get('volume_24h', 0))
-                                
-                                if funding_rate >= threshold and volume_24h >= min_volume:
-                                    monitor_pool[symbol] = info
-                            except (ValueError, TypeError) as e:
-                                print(f"⚠️ 处理监控合约 {symbol} 时出错: {e}")
-                                continue
+                    print("⚠️ 监控合约池为空，显示空数据")
+                    monitor_pool = {}
                 
                 # 转换为列表格式
                 for symbol, info in monitor_pool.items():
@@ -636,29 +617,9 @@ def get_latest_funding_rates(latest_rates_clicks, current_interval):
                     else:
                         cached_count += 1
                 
-                # 检查资金费率并发送通知（统一通知逻辑）
-                try:
-                    from utils.funding_rate_utils import FundingRateUtils
-                    from config.settings import settings
-                    
-                    # 从settings.py获取阈值配置
-                    threshold = settings.FUNDING_RATE_THRESHOLD
-                    
-                    # 使用工具类检查资金费率
-                    warning_count, messages = FundingRateUtils.check_funding_rates(
-                        latest_contracts, 
-                        threshold, 
-                        "Web界面"
-                    )
-                    
-                    if warning_count > 0:
-                        print(f"📢 Web界面: 发送了 {warning_count} 个资金费率警告通知")
-                        
-                except ImportError:
-                    warning_count = 0
-                except Exception as e:
-                    print(f"❌ Web界面: 资金费率检查失败: {e}")
-                    warning_count = 0
+                # 不再发送资金费率警告，避免与入池出池通知重复
+                # 资金费率警告现在由API的入池出池逻辑统一处理
+                warning_count = 0
                 
                 # 构建通知消息（不改变页面展示内容）
                 notification_msg = f"✅ 缓存已更新！成功获取 {len(latest_contracts)} 个合约的最新资金费率数据 (实时: {real_time_count}, 缓存: {cached_count}) | 缓存时间: {cache_time}"
