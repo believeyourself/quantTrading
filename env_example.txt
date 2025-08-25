@@ -6,25 +6,38 @@ API_HOST=0.0.0.0
 API_PORT=8000
 DEBUG=true
 
-# 交易配置
-DEFAULT_CAPITAL=10000.0
-MAX_POSITION_SIZE=0.1
-STOP_LOSS_RATIO=0.05
-TAKE_PROFIT_RATIO=0.1
-
-# 数据源配置
-DATA_SOURCE=yfinance
-DEFAULT_TIMEFRAME=1d
-
-# 交易所配置 (用于实盘交易)
-EXCHANGE_NAME=binance
-API_KEY=your_api_key_here
-API_SECRET=your_api_secret_here
-TESTNET=true
-
 # 日志配置
 LOG_LEVEL=INFO
-LOG_FILE=logs/quant_trading.log 
+LOG_FILE=logs/quant_trading.log
 
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here  # 用于发送通知的Telegram机器人Token
-TELEGRAM_CHAT_ID=your_telegram_chat_id_here      # 用于接收通知的Telegram聊天ID 
+# 资金费率监控策略配置
+FUNDING_RATE_THRESHOLD=0.005
+MAX_POOL_SIZE=20
+MIN_VOLUME=1000000
+CACHE_DURATION=7200
+UPDATE_INTERVAL=1800
+CONTRACT_REFRESH_INTERVAL=10800
+FUNDING_RATE_CHECK_INTERVAL=600
+
+# 交易所配置
+EXCHANGES=binance,okx,bybit
+
+# Telegram通知配置
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+TELEGRAM_CHAT_ID=your_telegram_chat_id
+
+# 邮件通知配置
+# 注意：必须使用邮箱的授权码，不是登录密码
+# 授权码获取方法：
+# QQ邮箱: 设置 -> 账户 -> 开启SMTP服务 -> 生成授权码
+# 163邮箱: 设置 -> POP3/SMTP/IMAP -> 开启SMTP服务 -> 客户端授权密码
+# Gmail: 账户设置 -> 安全性 -> 应用专用密码
+# Outlook: 账户设置 -> 安全性 -> 应用密码
+SMTP_SERVER=smtp.qq.com
+SMTP_PORT=587
+SMTP_USERNAME=your_email@qq.com
+SMTP_AUTH_CODE=your_auth_code
+SMTP_RECIPIENT=recipient@example.com
+SMTP_USE_SSL=false
+SMTP_USE_TLS=true
+EMAIL_ENABLED=true 

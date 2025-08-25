@@ -47,7 +47,7 @@ def send_telegram_message(message: str, chat_id: Optional[str] = None, bot_token
 
 def send_email_notification(subject: str, message: str, to_email: Optional[str] = None) -> bool:
     """
-    发送邮件通知（预留功能）
+    发送邮件通知
     
     Args:
         subject: 邮件主题
@@ -57,9 +57,26 @@ def send_email_notification(subject: str, message: str, to_email: Optional[str] 
     Returns:
         bool: 发送是否成功
     """
-    # TODO: 实现邮件发送功能
-    logger.info(f"邮件通知功能待实现: {subject}")
-    return False
+    try:
+        from utils.email_sender import EmailSender
+        
+        email_sender = EmailSender()
+        
+        # 如果指定了收件人，使用指定的；否则使用配置中的默认收件人
+        recipients = [to_email] if to_email else None
+        
+        success = email_sender.send_email(subject, message, recipients=recipients)
+        
+        if success:
+            logger.info(f"邮件通知发送成功: {subject}")
+        else:
+            logger.warning(f"邮件通知发送失败: {subject}")
+            
+        return success
+        
+    except Exception as e:
+        logger.error(f"发送邮件通知失败: {e}")
+        return False
 
 def send_discord_notification(message: str, webhook_url: Optional[str] = None) -> bool:
     """

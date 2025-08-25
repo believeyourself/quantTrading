@@ -19,7 +19,7 @@ from config.settings import settings
 # 内联数据读取功能，不再依赖data模块
 from strategies.factory import StrategyFactory
 from api.routes import app
-from utils.notifier import send_telegram_message
+from utils.notifier import send_telegram_message, send_email_notification
 
 # 导入新的监控策略
 from strategies.funding_rate_arbitrage import FundingRateMonitor
@@ -64,6 +64,15 @@ class MonitorSystem:
             logger.info("✅ 所有监控策略已启动")
             logger.info("💡 系统将自动执行定时任务")
             
+            # 发送系统启动邮件通知
+            try:
+                send_email_notification(
+                    "系统启动通知", 
+                    "量化交易资金费率监控系统已成功启动，所有监控策略已激活。"
+                )
+            except Exception as e:
+                logger.warning(f"发送系统启动邮件通知失败: {e}")
+            
             # 保持系统运行
             while self.running:
                 await asyncio.sleep(1)
@@ -75,6 +84,16 @@ class MonitorSystem:
     def stop(self):
         """停止监控系统"""
         self.running = False
+        
+        # 发送系统停止邮件通知
+        try:
+            send_email_notification(
+                "系统停止通知", 
+                "量化交易资金费率监控系统已停止运行。"
+            )
+        except Exception as e:
+            logger.warning(f"发送系统停止邮件通知失败: {e}")
+        
         for monitor in self.monitors:
             monitor.stop_monitoring()
         logger.info("监控系统已停止")

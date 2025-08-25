@@ -33,6 +33,16 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str = "7913734952:AAF65AZeiNEPbU-6TqLIcbIujj6qln0qY0k"
     TELEGRAM_CHAT_ID: str = "1394654481"
     
+    # 邮件通知配置
+    SMTP_SERVER: str = "smtp.163.com"           # SMTP服务器地址
+    SMTP_PORT: int = 465                        # SMTP端口（使用SSL端口）
+    SMTP_USERNAME: str = "farmerlzj@163.com"   # 发件人邮箱
+    SMTP_AUTH_CODE: str = "LCvVGTXXSEgQNkmj"      # 邮箱授权码（不是登录密码）
+    SMTP_RECIPIENT: str = "634206380@qq.com"  # 收件人邮箱
+    SMTP_USE_SSL: bool = True                   # 是否使用SSL
+    SMTP_USE_TLS: bool = False                  # 是否使用TLS
+    EMAIL_ENABLED: bool = True                  # 是否启用邮件通知
+    
     class Config:
         env_file = ".env"
 

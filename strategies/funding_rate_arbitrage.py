@@ -5,6 +5,7 @@ from typing import Dict, Set, Optional, List, Tuple
 from datetime import datetime, timedelta
 from .base import BaseStrategy
 from utils.notifier import send_telegram_message
+from utils.email_sender import send_funding_rate_warning_email, send_pool_change_email
 from config.proxy_settings import get_proxy_dict, get_ccxt_proxy_config, test_proxy_connection
 import threading
 import schedule
@@ -265,6 +266,9 @@ class FundingRateMonitor(BaseStrategy):
                 print(f"🔻 出池合约: {', '.join(removed_contracts)}")
                 # 只有在非首次刷新时才发送出池通知
                 if self.last_update_time and (datetime.now() - self.last_update_time).total_seconds() > 60:
+                    # 收集出池合约信息用于邮件通知
+                    removed_contracts_info = []
+                    
                     for symbol in removed_contracts:
                         if symbol in self.cached_contracts:
                             info = self.cached_contracts[symbol]
@@ -277,9 +281,17 @@ class FundingRateMonitor(BaseStrategy):
                                      f"标记价格: ${mark_price:.4f}\n" \
                                      f"24h成交量: {volume_24h:,.0f}"
                             send_telegram_message(message)
+                            
+                            # 收集信息用于邮件通知
+                            removed_contracts_info.append(symbol)
                         else:
                             # 如果没有详细信息，发送简单通知
                             send_telegram_message(f"🔻 合约出池: {symbol}")
+                            removed_contracts_info.append(symbol)
+                    
+                    # 发送邮件通知
+                    if removed_contracts_info:
+                        send_pool_change_email([], removed_contracts_info)
                 else:
                     print(f"⚠️ 首次刷新，跳过出池通知")
             
@@ -289,6 +301,9 @@ class FundingRateMonitor(BaseStrategy):
                 print(f"🔺 入池合约: {', '.join(added_contracts)}")
                 # 只有在非首次刷新时才发送入池通知
                 if self.last_update_time and (datetime.now() - self.last_update_time).total_seconds() > 60:
+                    # 收集入池合约信息用于邮件通知
+                    added_contracts_info = []
+                    
                     for symbol in added_contracts:
                         if symbol in selected_contracts:
                             info = selected_contracts[symbol]
@@ -301,9 +316,17 @@ class FundingRateMonitor(BaseStrategy):
                                      f"标记价格: ${mark_price:.4f}\n" \
                                      f"24h成交量: {volume_24h:,.0f}"
                             send_telegram_message(message)
+                            
+                            # 收集信息用于邮件通知
+                            added_contracts_info.append(symbol)
                         else:
                             # 如果没有详细信息，发送简单通知
                             send_telegram_message(f"🔺 合约入池: {symbol}")
+                            added_contracts_info.append(symbol)
+                    
+                    # 发送邮件通知
+                    if added_contracts_info:
+                        send_pool_change_email(added_contracts_info, [])
                 else:
                     print(f"⚠️ 首次刷新，跳过入池通知")
             
@@ -384,13 +407,57 @@ class FundingRateMonitor(BaseStrategy):
             print(f"❌ 定时任务: 使用缓存数据检查失败: {e}")
 
     def _check_funding_rates_from_cache(self):
-        """从缓存检查资金费率（不再发送警告）"""
+        """从缓存检查资金费率并发送警告邮件"""
         try:
             print(f"✅ 定时任务(缓存): 使用缓存数据检查完成，共 {len(self.cached_contracts)} 个合约")
-            print("ℹ️  资金费率警告现在由API的入池出池逻辑统一处理，避免重复通知")
+            
+            # 检查资金费率并发送警告邮件
+            self._send_funding_rate_warnings()
                 
         except Exception as e:
             print(f"❌ 定时任务: 缓存资金费率检查失败: {e}")
+    
+    def _send_funding_rate_warnings(self):
+        """发送资金费率警告邮件"""
+        try:
+            warning_count = 0
+            threshold = self.parameters['funding_rate_threshold']
+            
+            for symbol, info in self.cached_contracts.items():
+                try:
+                    funding_rate = abs(float(info.get('current_funding_rate', 0)))
+                    
+                    if funding_rate >= threshold:
+                        # 发送资金费率警告邮件
+                        mark_price = float(info.get('mark_price', 0))
+                        volume_24h = float(info.get('volume_24h', 0))
+                        next_funding_time = info.get('next_funding_time', '未知')
+                        
+                        success = send_funding_rate_warning_email(
+                            symbol=symbol,
+                            funding_rate=float(info.get('current_funding_rate', 0)),
+                            mark_price=mark_price,
+                            volume_24h=volume_24h,
+                            next_funding_time=next_funding_time
+                        )
+                        
+                        if success:
+                            warning_count += 1
+                            print(f"📧 已发送资金费率警告邮件: {symbol} ({funding_rate:.4%})")
+                        else:
+                            print(f"⚠️ 发送资金费率警告邮件失败: {symbol}")
+                            
+                except (ValueError, TypeError) as e:
+                    print(f"⚠️ 处理合约 {symbol} 数据时出错: {e}")
+                    continue
+            
+            if warning_count > 0:
+                print(f"📧 本次检查发送了 {warning_count} 个资金费率警告邮件")
+            else:
+                print("✅ 所有合约资金费率都在正常范围内")
+                
+        except Exception as e:
+            print(f"❌ 发送资金费率警告邮件失败: {e}")
 
     def start_monitoring(self):
         """启动监控系统（包括定时任务）"""

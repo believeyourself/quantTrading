@@ -16,7 +16,7 @@ from strategies.factory import StrategyFactory
 from strategies.funding_rate_arbitrage import FundingRateMonitor
 # 内联数据读取功能，不再依赖data模块
 from config.settings import settings
-from utils.notifier import send_telegram_message
+from utils.notifier import send_telegram_message, send_email_notification
 
 # 在文件顶部导入os
 import os
@@ -851,3 +851,92 @@ def get_latest_funding_rates():
     except Exception as e:
         print(f"❌ 获取最新资金费率异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取最新资金费率失败: {str(e)}")
+
+
+# 邮件通知测试端点
+@app.post("/test/email")
+def test_email_notification():
+    """测试邮件通知功能"""
+    try:
+        # 发送测试邮件
+        success = send_email_notification(
+            "邮件通知测试", 
+            "这是一封测试邮件，用于验证邮件配置是否正确。\n\n如果您收到这封邮件，说明邮件通知功能正常工作。"
+        )
+        
+        if success:
+            return {
+                "status": "success",
+                "message": "测试邮件发送成功",
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            return {
+                "status": "error",
+                "message": "测试邮件发送失败",
+                "timestamp": datetime.now().isoformat()
+            }
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"测试邮件发送失败: {str(e)}")
+
+
+@app.post("/test/email/funding-warning")
+def test_funding_rate_warning_email():
+    """测试资金费率警告邮件"""
+    try:
+        from utils.email_sender import send_funding_rate_warning_email
+        
+        # 发送测试资金费率警告邮件
+        success = send_funding_rate_warning_email(
+            symbol="BTCUSDT",
+            funding_rate=0.008,  # 0.8%
+            mark_price=50000.0,
+            volume_24h=10000000,
+            next_funding_time="2024-01-01 08:00:00"
+        )
+        
+        if success:
+            return {
+                "status": "success",
+                "message": "资金费率警告测试邮件发送成功",
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            return {
+                "status": "error",
+                "message": "资金费率警告测试邮件发送失败",
+                "timestamp": datetime.now().isoformat()
+            }
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"测试资金费率警告邮件发送失败: {str(e)}")
+
+
+@app.post("/test/email/pool-change")
+def test_pool_change_email():
+    """测试监控池变化邮件"""
+    try:
+        from utils.email_sender import send_pool_change_email
+        
+        # 发送测试监控池变化邮件
+        success = send_pool_change_email(
+            added_contracts=["BTCUSDT", "ETHUSDT"],
+            removed_contracts=["DOGEUSDT"]
+        )
+        
+        if success:
+            return {
+                "status": "success",
+                "message": "监控池变化测试邮件发送成功",
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            return {
+                "status": "error",
+                "message": "监控池变化测试邮件发送失败",
+                "timestamp": datetime.now().isoformat()
+            }
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"测试监控池变化邮件发送失败: {str(e)}")
