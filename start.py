@@ -146,31 +146,10 @@ def main():
             print("  all     - 全部启动（Web + API + 主程序）")
             sys.exit(1)
     else:
-        # 交互式菜单模式
-        while True:
-            show_menu()
-            try:
-                choice = input("请输入选择 (1-5): ").strip()
-                
-                if choice == '1':
-                    start_web()
-                elif choice == '2':
-                    start_api()
-                elif choice == '3':
-                    start_main()
-                elif choice == '4':
-                    start_all()
-                elif choice == '5':
-                    print("👋 再见!")
-                    sys.exit(0)
-                else:
-                    print("❌ 无效选择，请输入1-5")
-                    
-            except KeyboardInterrupt:
-                print("\n👋 再见!")
-                sys.exit(0)
-            except Exception as e:
-                print(f"❌ 启动失败: {e}")
+        # 默认启动所有服务
+        print("🚀 默认启动所有服务...")
+        print("启动模式: 全部启动 (Web + API + 主程序)")
+        start_all()
 
 if __name__ == "__main__":
     main()
