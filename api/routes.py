@@ -10,8 +10,7 @@ import traceback
 import os
 import requests # Added for direct API calls
 
-from utils.models import Strategy
-from utils.database import SessionLocal, get_db
+# 数据库相关导入已移除，直接从settings.py读取配置
 from strategies.factory import StrategyFactory
 from strategies.funding_rate_arbitrage import FundingRateMonitor
 # 内联数据读取功能，不再依赖data模块

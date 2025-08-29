@@ -119,23 +119,13 @@ class ConfigValidator:
     @staticmethod
     def validate_database_config() -> Tuple[bool, List[str]]:
         """
-        验证数据库配置
+        数据库配置验证已移除
         
         Returns:
             (是否有效, 错误消息列表)
         """
-        errors = []
-        
-        # 验证数据库URL
-        db_url = settings.DATABASE_URL
-        if not db_url:
-            errors.append("数据库URL未配置")
-        elif not isinstance(db_url, str):
-            errors.append("数据库URL必须是字符串")
-        elif not db_url.startswith(('sqlite:///', 'postgresql://', 'mysql://')):
-            errors.append("数据库URL格式不正确")
-        
-        return len(errors) == 0, errors
+        # 数据库功能已移除，直接返回成功
+        return True, []
     
     @staticmethod
     def validate_api_config() -> Tuple[bool, List[str]]:

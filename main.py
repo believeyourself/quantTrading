@@ -6,7 +6,6 @@
 import os
 import sys
 import asyncio
-import json
 import signal
 from loguru import logger
 from datetime import datetime
@@ -14,9 +13,7 @@ from datetime import datetime
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from utils.database import init_db, SessionLocal
 from config.settings import settings
-# 内联数据读取功能，不再依赖data模块
 from strategies.factory import StrategyFactory
 from api.routes import app
 from utils.notifier import send_telegram_message, send_email_notification
@@ -44,12 +41,8 @@ class MonitorSystem:
             self.running = True
             logger.info("监控系统启动中...")
 
-            # 从数据库加载监控配置
-            self.load_monitors_from_db()
-
-            # 如果没有监控配置，创建默认配置
-            if not self.monitors:
-                self.create_default_monitor()
+            # 直接创建监控策略，从settings.py读取配置
+            self.create_monitor_from_settings()
 
             # 启动所有监控（包括定时任务）
             logger.info("启动监控策略...")
@@ -98,74 +91,32 @@ class MonitorSystem:
             monitor.stop_monitoring()
         logger.info("监控系统已停止")
 
-    def load_monitors_from_db(self):
-        """从数据库加载监控配置"""
+    def create_monitor_from_settings(self):
+        """直接从settings.py创建监控策略"""
         try:
-            logger.info("从数据库加载监控配置...")
-            db = SessionLocal()
-
-            from utils.models import Strategy
-            monitor_strategies = db.query(Strategy).filter(
-                Strategy.strategy_type == "funding_rate_arbitrage"
-            ).all()
-
-            for strategy in monitor_strategies:
-                params = json.loads(strategy.parameters)
-                monitor = StrategyFactory.create_strategy("funding_rate_arbitrage", params)
-                self.monitors.append(monitor)
-                logger.info(f"加载监控配置: {strategy.name}")
-
-            logger.info(f"成功加载 {len(self.monitors)} 个监控配置")
-
+            logger.info("从settings.py创建监控策略...")
+            
+            # 从settings.py读取配置参数
+            monitor_params = {
+                "funding_rate_threshold": settings.FUNDING_RATE_THRESHOLD,
+                "max_contracts_in_pool": settings.MAX_POOL_SIZE,
+                "min_volume": settings.MIN_VOLUME,
+                "cache_duration": settings.CACHE_DURATION,
+                "update_interval": settings.UPDATE_INTERVAL,
+                "contract_refresh_interval": settings.CONTRACT_REFRESH_INTERVAL,
+                "funding_rate_check_interval": settings.FUNDING_RATE_CHECK_INTERVAL,
+            }
+            
+            logger.info(f"📋 监控策略参数: {monitor_params}")
+            
+            # 创建监控实例
+            monitor = StrategyFactory.create_strategy("funding_rate_arbitrage", monitor_params)
+            self.monitors.append(monitor)
+            
+            logger.info("✅ 监控策略创建成功")
+            
         except Exception as e:
-            logger.error(f"从数据库加载监控配置失败: {e}")
-        finally:
-            db.close()
-
-    def create_default_monitor(self):
-        """创建默认监控配置"""
-        try:
-            logger.info("创建默认监控配置...")
-            db = SessionLocal()
-
-            from utils.models import Strategy
-            # 检查是否已有资金费率监控策略
-            existing = db.query(Strategy).filter(
-                Strategy.strategy_type == "funding_rate_arbitrage"
-            ).first()
-
-            if not existing:
-                # 默认监控配置
-                default_params = {
-                    "funding_rate_threshold": settings.FUNDING_RATE_THRESHOLD,
-                    "contract_refresh_interval": settings.CONTRACT_REFRESH_INTERVAL,
-                    "funding_rate_check_interval": settings.FUNDING_RATE_CHECK_INTERVAL,
-                    "max_pool_size": settings.MAX_POOL_SIZE,
-                    "min_volume": settings.MIN_VOLUME,
-                    "exchanges": settings.EXCHANGES
-                }
-
-                strategy = Strategy(
-                    name="资金费率监控策略-默认",
-                    description="资金费率监控策略的默认配置",
-                    strategy_type="funding_rate_arbitrage",
-                    parameters=json.dumps(default_params)
-                )
-                db.add(strategy)
-                db.commit()
-                logger.info("成功创建默认监控配置")
-
-                # 创建监控实例
-                monitor = StrategyFactory.create_strategy("funding_rate_arbitrage", default_params)
-                self.monitors.append(monitor)
-            else:
-                logger.info("数据库中已有监控配置，跳过默认创建")
-
-        except Exception as e:
-            logger.error(f"创建默认监控配置失败: {e}")
-            db.rollback()
-        finally:
-            db.close()
+            logger.error(f"创建监控策略失败: {e}")
 
 def setup_logging():
     """设置日志"""
@@ -191,16 +142,6 @@ def setup_logging():
         retention="30 days"
     )
 
-def initialize_database():
-    """初始化数据库"""
-    try:
-        logger.info("正在初始化数据库...")
-        init_db()
-        logger.info("数据库初始化完成")
-    except Exception as e:
-        logger.error(f"数据库初始化失败: {e}")
-        raise
-
 def test_data_connection():
     """测试数据连接"""
     try:
@@ -209,6 +150,7 @@ def test_data_connection():
         # 内联数据读取功能
         symbols = []
         try:
+            import json
             cache_file = "cache/all_funding_contracts_full.json"
             if os.path.exists(cache_file):
                 with open(cache_file, 'r', encoding='utf-8') as f:
@@ -288,9 +230,6 @@ def main():
         # 设置日志
         setup_logging()
         logger.info("=== 加密货币资金费率监控系统 启动 ===")
-
-        # 初始化数据库
-        initialize_database()
 
         # 测试数据连接
         test_data_connection()

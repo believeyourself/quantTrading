@@ -5,8 +5,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """系统配置"""
     
-    # 数据库配置
-    DATABASE_URL: str = "sqlite:///./quant_trading.db"
+    # 数据库配置已移除，系统现在直接从配置文件读取设置
     
     # API配置
     API_HOST: str = "0.0.0.0"
@@ -18,7 +17,7 @@ class Settings(BaseSettings):
     LOG_FILE: str = "logs/quant_trading.log"
     
     # 资金费率监控策略配置
-    FUNDING_RATE_THRESHOLD: float = 0.005  # 0.5% 资金费率阈值
+    FUNDING_RATE_THRESHOLD: float = 0.003  # 0.3% 资金费率阈值
     MAX_POOL_SIZE: int = 20                # 合约池最大合约数量
     MIN_VOLUME: float = 1000000            # 最小24小时成交量（USDT）
     CACHE_DURATION: int = 7200             # 缓存有效期（秒，2小时）

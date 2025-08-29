@@ -46,8 +46,6 @@ quantTrading/
 │   └── interface.py      # Web界面
 ├── utils/                # 工具模块
 │   ├── __init__.py
-│   ├── database.py       # 数据库工具
-│   ├── models.py         # 数据模型
 │   ├── binance_funding.py # Binance资金费率工具
 │   └── notifier.py       # 通知工具
 ├── cache/                # 缓存目录
@@ -56,7 +54,7 @@ quantTrading/
 ├── main.py               # 主程序
 ├── start.py              # 统一启动脚本
 ├── requirements.txt      # 依赖包
-├── env_example.txt       # 环境变量示例
+# 环境变量示例已移除，配置直接在config/settings.py中
 └── README.md            # 项目说明
 ```
 
@@ -64,7 +62,6 @@ quantTrading/
 
 ### 1. 环境要求
 - Python 3.8+
-- SQLite数据库
 - 网络连接（用于获取市场数据）
 
 ### 2. 安装依赖
@@ -72,15 +69,12 @@ quantTrading/
 pip install -r requirements.txt
 ```
 
-### 3. 配置环境变量
-复制 `env_example.txt` 为 `.env` 并修改配置：
-```bash
-cp env_example.txt .env
-```
-
-主要配置项：
-- `TELEGRAM_TOKEN`: Telegram机器人token（用于通知）
+### 3. 配置系统
+系统配置直接在 `config/settings.py` 文件中修改，主要配置项：
+- `FUNDING_RATE_THRESHOLD`: 资金费率阈值（默认0.3%）
+- `TELEGRAM_BOT_TOKEN`: Telegram机器人token（用于通知）
 - `TELEGRAM_CHAT_ID`: Telegram聊天ID
+- `SMTP_*`: 邮件通知配置
 
 ### 4. 启动系统
 
