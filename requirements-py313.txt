@@ -1,3 +1,6 @@
+# Python 3.13 + CentOS 7 兼容版本依赖配置
+# 使用预编译wheel包，避免编译问题
+
 # 核心依赖
 fastapi>=0.104.1
 uvicorn>=0.24.0
@@ -9,9 +12,10 @@ python-multipart>=0.0.6
 flask>=3.1.1
 flask-cors>=6.0.1
 
-# 数据处理和分析
-pandas>=2.2.3
-numpy>=1.25.2
+# 数据处理和分析 - 使用预编译wheel包
+# 这些版本有Python 3.13的预编译包
+pandas>=2.0.0
+numpy>=1.26.0
 
 # 图表和可视化
 plotly>=5.17.0
@@ -20,7 +24,7 @@ dash-bootstrap-components>=1.5.0
 
 # 配置管理
 pydantic-settings>=2.1.0
-python-dotenv>=1.0.0
+python-dotenv>=0.19.2
 
 # HTTP请求
 requests>=2.31.0
@@ -34,3 +38,7 @@ loguru>=0.7.2
 # 测试
 pytest>=7.4.3
 pytest-asyncio>=0.21.1
+
+# 额外兼容性包 - 升级到Python 3.13兼容版本
+setuptools>=69.0.0
+wheel>=0.42.0
