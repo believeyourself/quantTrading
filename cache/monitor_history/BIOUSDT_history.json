@@ -1,0 +1,1110 @@
+{
+  "symbol": "BIOUSDT",
+  "created_time": "2025-09-05T22:17:54.077134",
+  "history": [
+    {
+      "timestamp": "2025-09-05T22:17:54.077134",
+      "funding_rate": -0.00224337,
+      "mark_price": 0.1447,
+      "index_price": "0.14498189",
+      "last_updated": "2025-09-05T22:17:12.863044",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-05T22:18:00.203761",
+      "funding_rate": -0.00224337,
+      "mark_price": 0.14458,
+      "index_price": "0.14511844",
+      "last_updated": "2025-09-05T22:17:18.039643",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-05T22:20:35.227341",
+      "funding_rate": -0.00227089,
+      "mark_price": 0.14422816,
+      "index_price": "0.14479583",
+      "last_updated": "2025-09-05T22:19:51.865635",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-05T22:34:06.204968",
+      "funding_rate": -0.00239232,
+      "mark_price": 0.14327227,
+      "index_price": "0.14384264",
+      "last_updated": "2025-09-05T22:33:19.997297",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T01:41:39.674077",
+      "funding_rate": -0.0054786,
+      "mark_price": 0.16113881,
+      "index_price": "0.16326498",
+      "last_updated": "2025-09-06T01:41:01.683785",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T01:42:16.627164",
+      "funding_rate": -0.00556586,
+      "mark_price": 0.16257051,
+      "index_price": "0.16486801",
+      "last_updated": "2025-09-06T01:41:37.751765",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T01:42:55.544139",
+      "funding_rate": -0.00565801,
+      "mark_price": 0.1633971,
+      "index_price": "0.16606538",
+      "last_updated": "2025-09-06T01:42:16.202440",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T01:53:30.017529",
+      "funding_rate": -0.00670905,
+      "mark_price": 0.16508705,
+      "index_price": "0.16917669",
+      "last_updated": "2025-09-06T01:52:50.601872",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T01:54:10.818508",
+      "funding_rate": -0.00689601,
+      "mark_price": 0.16434,
+      "index_price": "0.16822246",
+      "last_updated": "2025-09-06T01:53:31.383448",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T01:54:44.389946",
+      "funding_rate": -0.00709907,
+      "mark_price": 0.16506,
+      "index_price": "0.16883965",
+      "last_updated": "2025-09-06T01:54:05.613009",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T01:55:32.111317",
+      "funding_rate": -0.00709907,
+      "mark_price": 0.16379,
+      "index_price": "0.16698216",
+      "last_updated": "2025-09-06T01:54:49.026855",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T02:06:04.524308",
+      "funding_rate": -0.00771356,
+      "mark_price": 0.16574238,
+      "index_price": "0.16882528",
+      "last_updated": "2025-09-06T02:05:22.546975",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T02:06:48.188253",
+      "funding_rate": -0.00784751,
+      "mark_price": 0.16541,
+      "index_price": "0.16822975",
+      "last_updated": "2025-09-06T02:06:04.426318",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T02:07:23.839458",
+      "funding_rate": -0.00784751,
+      "mark_price": 0.1652,
+      "index_price": "0.16803149",
+      "last_updated": "2025-09-06T02:06:40.035389",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T02:07:56.381651",
+      "funding_rate": -0.00784751,
+      "mark_price": 0.16609,
+      "index_price": "0.16883827",
+      "last_updated": "2025-09-06T02:07:13.697121",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T02:18:29.504991",
+      "funding_rate": -0.00848827,
+      "mark_price": 0.170052,
+      "index_price": "0.17272143",
+      "last_updated": "2025-09-06T02:17:47.618545",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T02:19:08.592342",
+      "funding_rate": -0.00858321,
+      "mark_price": 0.16988488,
+      "index_price": "0.17284088",
+      "last_updated": "2025-09-06T02:18:25.589539",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T02:19:42.855874",
+      "funding_rate": -0.00858321,
+      "mark_price": 0.17002066,
+      "index_price": "0.17290522",
+      "last_updated": "2025-09-06T02:19:01.428542",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T02:20:25.768925",
+      "funding_rate": -0.00858321,
+      "mark_price": 0.17068928,
+      "index_price": "0.17366844",
+      "last_updated": "2025-09-06T02:19:42.564239",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T02:30:39.388042",
+      "funding_rate": -0.00935545,
+      "mark_price": 0.1689136,
+      "index_price": "0.17113556",
+      "last_updated": "2025-09-06T02:30:01.018558",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T02:31:25.929217",
+      "funding_rate": -0.00935545,
+      "mark_price": 0.16768228,
+      "index_price": "0.16985190",
+      "last_updated": "2025-09-06T02:30:45.355057",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T02:32:04.110467",
+      "funding_rate": -0.00941821,
+      "mark_price": 0.16539,
+      "index_price": "0.16686283",
+      "last_updated": "2025-09-06T02:31:22.952387",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T02:32:35.194151",
+      "funding_rate": -0.00941821,
+      "mark_price": 0.163,
+      "index_price": "0.16413682",
+      "last_updated": "2025-09-06T02:31:55.949911",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T02:43:18.488205",
+      "funding_rate": -0.00963958,
+      "mark_price": 0.16786,
+      "index_price": "0.16986434",
+      "last_updated": "2025-09-06T02:42:36.669886",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T02:43:57.477813",
+      "funding_rate": -0.00968673,
+      "mark_price": 0.16803479,
+      "index_price": "0.17005987",
+      "last_updated": "2025-09-06T02:43:16.717009",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T02:44:20.385194",
+      "funding_rate": -0.00968673,
+      "mark_price": 0.16809,
+      "index_price": "0.17005289",
+      "last_updated": "2025-09-06T02:43:42.715818",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T02:44:54.765984",
+      "funding_rate": -0.00972955,
+      "mark_price": 0.16721,
+      "index_price": "0.16897346",
+      "last_updated": "2025-09-06T02:44:17.449028",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T02:55:30.780374",
+      "funding_rate": -0.009797,
+      "mark_price": 0.16812,
+      "index_price": "0.16958927",
+      "last_updated": "2025-09-06T02:54:51.724729",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T02:56:04.833147",
+      "funding_rate": -0.00980899,
+      "mark_price": 0.16801,
+      "index_price": "0.16930334",
+      "last_updated": "2025-09-06T02:55:27.656938",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T02:56:45.484917",
+      "funding_rate": -0.00981217,
+      "mark_price": 0.16852382,
+      "index_price": "0.16996014",
+      "last_updated": "2025-09-06T02:56:07.703265",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T02:57:33.907588",
+      "funding_rate": -0.00981217,
+      "mark_price": 0.16792,
+      "index_price": "0.16930720",
+      "last_updated": "2025-09-06T02:56:51.557251",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T03:08:45.912106",
+      "funding_rate": -0.00967351,
+      "mark_price": 0.16611,
+      "index_price": "0.16715412",
+      "last_updated": "2025-09-06T03:08:03.451654",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T03:09:02.427862",
+      "funding_rate": -0.00967351,
+      "mark_price": 0.16593,
+      "index_price": "0.16692743",
+      "last_updated": "2025-09-06T03:07:23.557974",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T03:09:05.068375",
+      "funding_rate": -0.00967351,
+      "mark_price": 0.16617,
+      "index_price": "0.16729339",
+      "last_updated": "2025-09-06T03:08:27.877163",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T03:09:53.028007",
+      "funding_rate": -0.00966153,
+      "mark_price": 0.16585,
+      "index_price": "0.16695590",
+      "last_updated": "2025-09-06T03:09:12.498526",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T03:20:19.152434",
+      "funding_rate": -0.00938773,
+      "mark_price": 0.16516,
+      "index_price": "0.16587712",
+      "last_updated": "2025-09-06T03:19:40.947148",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T03:20:56.329408",
+      "funding_rate": -0.00938773,
+      "mark_price": 0.16464223,
+      "index_price": "0.16526049",
+      "last_updated": "2025-09-06T03:20:17.840450",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T03:21:47.374886",
+      "funding_rate": -0.00933896,
+      "mark_price": 0.16434,
+      "index_price": "0.16468813",
+      "last_updated": "2025-09-06T03:21:05.152776",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T03:22:15.759569",
+      "funding_rate": -0.00933896,
+      "mark_price": 0.16374,
+      "index_price": "0.16394321",
+      "last_updated": "2025-09-06T03:21:35.973064",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T03:32:53.307046",
+      "funding_rate": -0.00867307,
+      "mark_price": 0.16165,
+      "index_price": "0.16153145",
+      "last_updated": "2025-09-06T03:32:12.108714",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T03:33:26.398127",
+      "funding_rate": -0.00867307,
+      "mark_price": 0.16196,
+      "index_price": "0.16187698",
+      "last_updated": "2025-09-06T03:32:46.315635",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T03:34:06.762910",
+      "funding_rate": -0.00857352,
+      "mark_price": 0.16144,
+      "index_price": "0.16131335",
+      "last_updated": "2025-09-06T03:33:25.605268",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T03:34:32.618630",
+      "funding_rate": -0.00857352,
+      "mark_price": 0.16124,
+      "index_price": "0.16121118",
+      "last_updated": "2025-09-06T03:33:54.960522",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T03:45:04.083962",
+      "funding_rate": -0.00777387,
+      "mark_price": 0.16029775,
+      "index_price": "0.16028590",
+      "last_updated": "2025-09-06T03:44:27.372147",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T03:45:43.039119",
+      "funding_rate": -0.00767779,
+      "mark_price": 0.16061,
+      "index_price": "0.16063181",
+      "last_updated": "2025-09-06T03:45:05.649656",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T03:46:18.212444",
+      "funding_rate": -0.00767779,
+      "mark_price": 0.16099828,
+      "index_price": "0.16103932",
+      "last_updated": "2025-09-06T03:45:41.070494",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T03:47:10.889865",
+      "funding_rate": -0.00759231,
+      "mark_price": 0.16278,
+      "index_price": "0.16280998",
+      "last_updated": "2025-09-06T03:46:29.275551",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T03:57:30.875131",
+      "funding_rate": -0.00713295,
+      "mark_price": 0.16583,
+      "index_price": "0.16654028",
+      "last_updated": "2025-09-06T03:56:53.170596",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T03:58:14.884441",
+      "funding_rate": -0.0070938,
+      "mark_price": 0.16634191,
+      "index_price": "0.16717955",
+      "last_updated": "2025-09-06T03:57:35.283806",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T03:58:47.490191",
+      "funding_rate": -0.0070938,
+      "mark_price": 0.16613961,
+      "index_price": "0.16710766",
+      "last_updated": "2025-09-06T03:58:09.017031",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T03:59:19.103334",
+      "funding_rate": -0.0070938,
+      "mark_price": 0.16697,
+      "index_price": "0.16791680",
+      "last_updated": "2025-09-06T03:58:42.197436",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T04:10:00.564083",
+      "funding_rate": -0.00688257,
+      "mark_price": 0.16750235,
+      "index_price": "0.16812880",
+      "last_updated": "2025-09-06T04:09:19.822227",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T04:10:42.946163",
+      "funding_rate": -0.00683479,
+      "mark_price": 0.16878,
+      "index_price": "0.16960400",
+      "last_updated": "2025-09-06T04:10:02.254827",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T04:11:24.143660",
+      "funding_rate": -0.00683479,
+      "mark_price": 0.16747,
+      "index_price": "0.16827037",
+      "last_updated": "2025-09-06T04:10:42.028237",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T04:11:43.277956",
+      "funding_rate": -0.00678623,
+      "mark_price": 0.16767774,
+      "index_price": "0.16845098",
+      "last_updated": "2025-09-06T04:11:06.787188",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T04:22:16.676995",
+      "funding_rate": -0.00652914,
+      "mark_price": 0.16555,
+      "index_price": "0.16618609",
+      "last_updated": "2025-09-06T04:21:40.064055",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T04:23:08.364025",
+      "funding_rate": -0.00648011,
+      "mark_price": 0.16551,
+      "index_price": "0.16621117",
+      "last_updated": "2025-09-06T04:22:26.354213",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T04:23:45.404246",
+      "funding_rate": -0.00642965,
+      "mark_price": 0.16547622,
+      "index_price": "0.16614138",
+      "last_updated": "2025-09-06T04:23:04.141997",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T04:24:26.985059",
+      "funding_rate": -0.00642965,
+      "mark_price": 0.1654702,
+      "index_price": "0.16608929",
+      "last_updated": "2025-09-06T04:23:44.574973",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T04:34:54.715319",
+      "funding_rate": -0.00607047,
+      "mark_price": 0.16421,
+      "index_price": "0.16484286",
+      "last_updated": "2025-09-06T04:34:13.784060",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T04:35:27.749719",
+      "funding_rate": -0.00607047,
+      "mark_price": 0.16427,
+      "index_price": "0.16486548",
+      "last_updated": "2025-09-06T04:34:48.030419",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T04:35:55.718911",
+      "funding_rate": -0.00600639,
+      "mark_price": 0.16405,
+      "index_price": "0.16456132",
+      "last_updated": "2025-09-06T04:35:18.759759",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T04:36:48.408379",
+      "funding_rate": -0.00600639,
+      "mark_price": 0.16408,
+      "index_price": "0.16463342",
+      "last_updated": "2025-09-06T04:36:06.730611",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T04:47:16.586965",
+      "funding_rate": -0.00546559,
+      "mark_price": 0.163354,
+      "index_price": "0.16372551",
+      "last_updated": "2025-09-06T04:46:36.307309",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T04:47:48.242220",
+      "funding_rate": -0.0054015,
+      "mark_price": 0.1631,
+      "index_price": "0.16351669",
+      "last_updated": "2025-09-06T04:47:09.282628",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T04:48:22.408451",
+      "funding_rate": -0.0054015,
+      "mark_price": 0.16299,
+      "index_price": "0.16336658",
+      "last_updated": "2025-09-06T04:47:44.868481",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T04:49:08.046728",
+      "funding_rate": -0.0054015,
+      "mark_price": 0.16295877,
+      "index_price": "0.16326119",
+      "last_updated": "2025-09-06T04:48:27.886461",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T04:59:40.381403",
+      "funding_rate": -0.0048197,
+      "mark_price": 0.16268,
+      "index_price": "0.16296690",
+      "last_updated": "2025-09-06T04:59:00.425397",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T09:45:38.112678",
+      "funding_rate": -0.00535748,
+      "mark_price": 0.18392,
+      "index_price": "0.18570022",
+      "last_updated": "2025-09-06T09:44:58.645022",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T09:46:12.555619",
+      "funding_rate": -0.00540876,
+      "mark_price": 0.1846,
+      "index_price": "0.18632849",
+      "last_updated": "2025-09-06T09:45:34.325274",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T09:46:50.274975",
+      "funding_rate": -0.00540876,
+      "mark_price": 0.18453228,
+      "index_price": "0.18626255",
+      "last_updated": "2025-09-06T09:46:12.143433",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T09:57:27.017285",
+      "funding_rate": -0.00551159,
+      "mark_price": 0.1782,
+      "index_price": "0.17864794",
+      "last_updated": "2025-09-06T09:56:47.508249",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T09:58:04.047176",
+      "funding_rate": -0.00551159,
+      "mark_price": 0.17740215,
+      "index_price": "0.17800690",
+      "last_updated": "2025-09-06T09:57:24.760766",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T09:58:52.674578",
+      "funding_rate": -0.00548729,
+      "mark_price": 0.17554054,
+      "index_price": "0.17607797",
+      "last_updated": "2025-09-06T09:58:09.651041",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T09:59:28.681476",
+      "funding_rate": -0.00548729,
+      "mark_price": 0.17598391,
+      "index_price": "0.17651679",
+      "last_updated": "2025-09-06T09:58:45.971556",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T10:09:53.411080",
+      "funding_rate": -0.0056559,
+      "mark_price": 0.17917,
+      "index_price": "0.18119585",
+      "last_updated": "2025-09-06T10:09:14.396512",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T10:10:53.458039",
+      "funding_rate": -0.0057181,
+      "mark_price": 0.17947,
+      "index_price": "0.18127436",
+      "last_updated": "2025-09-06T10:10:07.121881",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T10:11:05.224057",
+      "funding_rate": -0.0057181,
+      "mark_price": 0.17875,
+      "index_price": "0.18073144",
+      "last_updated": "2025-09-06T10:10:26.313880",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T10:11:38.095147",
+      "funding_rate": -0.0057181,
+      "mark_price": 0.17867,
+      "index_price": "0.18060286",
+      "last_updated": "2025-09-06T10:11:00.803807",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T10:22:26.168088",
+      "funding_rate": -0.00601617,
+      "mark_price": 0.17939513,
+      "index_price": "0.18108803",
+      "last_updated": "2025-09-06T10:21:44.732203",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T10:23:02.020193",
+      "funding_rate": -0.00605506,
+      "mark_price": 0.17867,
+      "index_price": "0.18037876",
+      "last_updated": "2025-09-06T10:22:19.626735",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T10:23:30.219501",
+      "funding_rate": -0.00605506,
+      "mark_price": 0.17856,
+      "index_price": "0.18029156",
+      "last_updated": "2025-09-06T10:22:50.122278",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T10:24:16.107516",
+      "funding_rate": -0.00609954,
+      "mark_price": 0.17927,
+      "index_price": "0.18071198",
+      "last_updated": "2025-09-06T10:23:34.932715",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T10:34:38.979285",
+      "funding_rate": -0.00631771,
+      "mark_price": 0.1770653,
+      "index_price": "0.17848484",
+      "last_updated": "2025-09-06T10:34:01.375856",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T10:35:17.315931",
+      "funding_rate": -0.00634455,
+      "mark_price": 0.17648,
+      "index_price": "0.17770543",
+      "last_updated": "2025-09-06T10:34:39.148673",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T10:36:05.717384",
+      "funding_rate": -0.00636175,
+      "mark_price": 0.17688566,
+      "index_price": "0.17811569",
+      "last_updated": "2025-09-06T10:35:23.914676",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T10:36:29.094408",
+      "funding_rate": -0.00636175,
+      "mark_price": 0.17677,
+      "index_price": "0.17790274",
+      "last_updated": "2025-09-06T10:35:51.337650",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T10:47:07.550335",
+      "funding_rate": -0.00641163,
+      "mark_price": 0.17573,
+      "index_price": "0.17685150",
+      "last_updated": "2025-09-06T10:46:27.984040",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T10:47:55.006613",
+      "funding_rate": -0.00642212,
+      "mark_price": 0.17682,
+      "index_price": "0.17800969",
+      "last_updated": "2025-09-06T10:47:12.411536",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T10:48:17.733965",
+      "funding_rate": -0.00642212,
+      "mark_price": 0.17719,
+      "index_price": "0.17838741",
+      "last_updated": "2025-09-06T10:47:39.966040",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T10:48:57.893381",
+      "funding_rate": -0.00642212,
+      "mark_price": 0.17790634,
+      "index_price": "0.17915923",
+      "last_updated": "2025-09-06T10:48:18.796801",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T10:59:44.602549",
+      "funding_rate": -0.00652711,
+      "mark_price": 0.17983,
+      "index_price": "0.18112309",
+      "last_updated": "2025-09-06T10:59:02.173931",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:00:09.459960",
+      "funding_rate": -0.00652711,
+      "mark_price": 0.1799,
+      "index_price": "0.18118653",
+      "last_updated": "2025-09-06T10:59:29.071193",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:00:41.265728",
+      "funding_rate": -0.00652711,
+      "mark_price": 0.18036,
+      "index_price": "0.18153688",
+      "last_updated": "2025-09-06T10:59:55.860837",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:01:00.879916",
+      "funding_rate": -0.00652711,
+      "mark_price": 0.18016251,
+      "index_price": "0.18142261",
+      "last_updated": "2025-09-06T11:00:18.050368",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:01:32.436274",
+      "funding_rate": -0.00652711,
+      "mark_price": 0.17949,
+      "index_price": "0.18075547",
+      "last_updated": "2025-09-06T11:00:50.965436",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:01:41.954152",
+      "funding_rate": -0.00652711,
+      "mark_price": 0.17972187,
+      "index_price": "0.18100471",
+      "last_updated": "2025-09-06T11:00:59.969959",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:01:53.751228",
+      "funding_rate": -0.00653568,
+      "mark_price": 0.17995,
+      "index_price": "0.18116160",
+      "last_updated": "2025-09-06T11:01:12.181604",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:02:05.893315",
+      "funding_rate": -0.00653568,
+      "mark_price": 0.18054,
+      "index_price": "0.18182162",
+      "last_updated": "2025-09-06T11:01:27.362045",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:02:48.500189",
+      "funding_rate": -0.00654579,
+      "mark_price": 0.18078,
+      "index_price": "0.18208716",
+      "last_updated": "2025-09-06T11:02:05.473134",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:03:23.262079",
+      "funding_rate": -0.00654579,
+      "mark_price": 0.18099,
+      "index_price": "0.18235913",
+      "last_updated": "2025-09-06T11:02:44.869130",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:12:10.026274",
+      "funding_rate": -0.00667332,
+      "mark_price": 0.18319618,
+      "index_price": "0.18489452",
+      "last_updated": "2025-09-06T11:11:27.325060",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:12:46.053619",
+      "funding_rate": -0.00670988,
+      "mark_price": 0.18198512,
+      "index_price": "0.18363952",
+      "last_updated": "2025-09-06T11:12:03.403231",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:13:22.110052",
+      "funding_rate": -0.00670988,
+      "mark_price": 0.18173,
+      "index_price": "0.18302920",
+      "last_updated": "2025-09-06T11:12:39.918558",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:14:02.878720",
+      "funding_rate": -0.0067336,
+      "mark_price": 0.18221213,
+      "index_price": "0.18358549",
+      "last_updated": "2025-09-06T11:13:19.910020",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:24:32.982128",
+      "funding_rate": -0.00678248,
+      "mark_price": 0.18002356,
+      "index_price": "0.18125746",
+      "last_updated": "2025-09-06T11:23:50.385969",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:25:08.775681",
+      "funding_rate": -0.00678758,
+      "mark_price": 0.17918,
+      "index_price": "0.18012236",
+      "last_updated": "2025-09-06T11:24:26.400229",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:25:37.967394",
+      "funding_rate": -0.00678758,
+      "mark_price": 0.17908,
+      "index_price": "0.18007200",
+      "last_updated": "2025-09-06T11:24:58.128924",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:26:22.243323",
+      "funding_rate": -0.00678549,
+      "mark_price": 0.17884969,
+      "index_price": "0.17989281",
+      "last_updated": "2025-09-06T11:25:41.302770",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:37:02.019528",
+      "funding_rate": -0.00669534,
+      "mark_price": 0.17855678,
+      "index_price": "0.17961074",
+      "last_updated": "2025-09-06T11:36:19.827183",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:37:33.554971",
+      "funding_rate": -0.00669534,
+      "mark_price": 0.17906,
+      "index_price": "0.18001737",
+      "last_updated": "2025-09-06T11:36:52.129383",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:38:07.173622",
+      "funding_rate": -0.00668319,
+      "mark_price": 0.17880763,
+      "index_price": "0.17981989",
+      "last_updated": "2025-09-06T11:37:26.195311",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:38:36.349203",
+      "funding_rate": -0.00668319,
+      "mark_price": 0.17890849,
+      "index_price": "0.17994440",
+      "last_updated": "2025-09-06T11:37:58.075610",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:49:25.842570",
+      "funding_rate": -0.00662734,
+      "mark_price": 0.18048773,
+      "index_price": "0.18152737",
+      "last_updated": "2025-09-06T11:48:42.893600",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:50:03.299681",
+      "funding_rate": -0.00661584,
+      "mark_price": 0.18077,
+      "index_price": "0.18181785",
+      "last_updated": "2025-09-06T11:49:19.822412",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:50:26.944125",
+      "funding_rate": -0.00661584,
+      "mark_price": 0.18008,
+      "index_price": "0.18112842",
+      "last_updated": "2025-09-06T11:49:47.406181",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T11:51:11.930554",
+      "funding_rate": -0.00660381,
+      "mark_price": 0.18132852,
+      "index_price": "0.18234583",
+      "last_updated": "2025-09-06T11:50:29.924148",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T12:02:04.675547",
+      "funding_rate": -0.00644569,
+      "mark_price": 0.1810192,
+      "index_price": "0.18219012",
+      "last_updated": "2025-09-06T12:01:18.841031",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T12:02:20.877548",
+      "funding_rate": -0.00644569,
+      "mark_price": 0.17891461,
+      "index_price": "0.18007020",
+      "last_updated": "2025-09-06T12:01:39.997523",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T12:03:04.124215",
+      "funding_rate": -0.00644276,
+      "mark_price": 0.17856287,
+      "index_price": "0.17971286",
+      "last_updated": "2025-09-06T12:02:20.972619",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T12:03:22.916562",
+      "funding_rate": -0.00644276,
+      "mark_price": 0.17854444,
+      "index_price": "0.17957109",
+      "last_updated": "2025-09-06T12:02:44.713438",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T12:14:11.873791",
+      "funding_rate": -0.00629586,
+      "mark_price": 0.17795445,
+      "index_price": "0.17877920",
+      "last_updated": "2025-09-06T12:13:30.317529",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T12:14:37.820204",
+      "funding_rate": -0.00629586,
+      "mark_price": 0.1783,
+      "index_price": "0.17910790",
+      "last_updated": "2025-09-06T12:13:58.975387",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T12:15:25.898145",
+      "funding_rate": -0.00629586,
+      "mark_price": 0.17893,
+      "index_price": "0.17974051",
+      "last_updated": "2025-09-06T12:14:42.753460",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T12:15:53.702564",
+      "funding_rate": -0.0062685,
+      "mark_price": 0.17899292,
+      "index_price": "0.17979218",
+      "last_updated": "2025-09-06T12:15:14.037495",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T12:26:35.423518",
+      "funding_rate": -0.00597071,
+      "mark_price": 0.17763,
+      "index_price": "0.17822704",
+      "last_updated": "2025-09-06T12:25:53.127796",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T12:27:11.819565",
+      "funding_rate": -0.00597071,
+      "mark_price": 0.17798,
+      "index_price": "0.17858850",
+      "last_updated": "2025-09-06T12:26:30.505515",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T12:27:45.358044",
+      "funding_rate": -0.00592614,
+      "mark_price": 0.17793,
+      "index_price": "0.17858082",
+      "last_updated": "2025-09-06T12:27:04.849973",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T12:28:22.180234",
+      "funding_rate": -0.00592614,
+      "mark_price": 0.17736,
+      "index_price": "0.17808706",
+      "last_updated": "2025-09-06T12:27:40.931855",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T12:39:09.937215",
+      "funding_rate": -0.00563344,
+      "mark_price": 0.18019744,
+      "index_price": "0.18077322",
+      "last_updated": "2025-09-06T12:38:24.477739",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T12:39:42.844526",
+      "funding_rate": -0.00563344,
+      "mark_price": 0.18019541,
+      "index_price": "0.18072085",
+      "last_updated": "2025-09-06T12:38:59.115309",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T12:40:08.542168",
+      "funding_rate": -0.00559358,
+      "mark_price": 0.18198934,
+      "index_price": "0.18240849",
+      "last_updated": "2025-09-06T12:39:28.313028",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T12:41:01.425248",
+      "funding_rate": -0.00554272,
+      "mark_price": 0.18196,
+      "index_price": "0.18230724",
+      "last_updated": "2025-09-06T12:40:16.923552",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T12:51:28.967187",
+      "funding_rate": -0.00516883,
+      "mark_price": 0.183619,
+      "index_price": "0.18423315",
+      "last_updated": "2025-09-06T12:50:46.130501",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T12:51:54.377351",
+      "funding_rate": -0.00512591,
+      "mark_price": 0.18301,
+      "index_price": "0.18368999",
+      "last_updated": "2025-09-06T12:51:15.067488",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T12:52:47.786511",
+      "funding_rate": -0.00509108,
+      "mark_price": 0.18332,
+      "index_price": "0.18407948",
+      "last_updated": "2025-09-06T12:52:02.287948",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T12:53:07.706549",
+      "funding_rate": -0.00509108,
+      "mark_price": 0.18303014,
+      "index_price": "0.18371783",
+      "last_updated": "2025-09-06T12:52:27.829866",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-06T13:03:44.871813",
+      "funding_rate": -0.0048499,
+      "mark_price": 0.18428678,
+      "index_price": "0.18516898",
+      "last_updated": "2025-09-06T13:03:03.793216",
+      "data_source": "real_time"
+    }
+  ]
+}

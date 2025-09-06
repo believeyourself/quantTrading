@@ -17,13 +17,19 @@ class Settings(BaseSettings):
     LOG_FILE: str = "logs/quant_trading.log"
     
     # 资金费率监控策略配置
-    FUNDING_RATE_THRESHOLD: float = 0.003  # 0.3% 资金费率阈值
+    FUNDING_RATE_THRESHOLD: float = 0.005  # 0.3% 资金费率阈值
     MAX_POOL_SIZE: int = 20                # 合约池最大合约数量
     MIN_VOLUME: float = 1000000            # 最小24小时成交量（USDT）
     CACHE_DURATION: int = 7200             # 缓存有效期（秒，2小时）
     UPDATE_INTERVAL: int = 1800            # 更新间隔（秒，30分钟）
     CONTRACT_REFRESH_INTERVAL: int = 10800  # 合约池刷新间隔（秒，3小时）
     FUNDING_RATE_CHECK_INTERVAL: int = 600 # 资金费率检查间隔（秒，10分钟）
+    
+    # API请求超时配置
+    API_REQUEST_TIMEOUT: int = 120         # API请求超时时间（秒）- 增加到2分钟
+    API_RETRY_COUNT: int = 2               # API请求重试次数 - 减少重试次数
+    API_RETRY_DELAY: int = 10              # API请求重试延迟（秒）- 增加延迟
+    CACHE_FALLBACK_ENABLED: bool = True    # 启用缓存回退机制
     
     # 交易所配置
     EXCHANGES: List[str] = ["binance", "okx", "bybit"]

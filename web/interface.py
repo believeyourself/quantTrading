@@ -6,6 +6,8 @@ import json
 import traceback
 from datetime import datetime, timezone, timedelta
 import os # Added for file operations
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 API_BASE_URL = "http://localhost:8000"
 
@@ -207,6 +209,54 @@ app.layout = dbc.Container([
                 ], width=12)
             ])
         ], label="合约监控", tab_id="candidates-overview"),
+        
+        dbc.Tab([
+            dbc.Row([
+                dbc.Col([
+                    html.H3("历史入池合约"),
+                    html.P("查看所有历史入池合约的列表和在池期间的记录历史资金费率。", className="text-muted"),
+                    html.Hr(),
+                    dbc.Button("🔄 刷新历史数据", id="refresh-history-btn", color="info", className="me-2 mb-2"),
+                    # 自动刷新组件
+                    dcc.Interval(
+                        id="history-interval",
+                        interval=30*1000,  # 30秒刷新一次
+                        n_intervals=0
+                    ),
+                    # 历史数据统计
+                    dbc.Row([
+                        dbc.Col([
+                            html.Div([
+                                html.I(className="fas fa-chart-bar me-2"),
+                                html.Span("历史合约总数: ", className="text-muted"),
+                                html.Span(id="history-contracts-count", className="fw-bold text-primary")
+                            ], className="mt-2 mb-3 p-2 bg-light rounded")
+                        ], width=6),
+                        dbc.Col([
+                            html.Div([
+                                html.I(className="fas fa-clock me-2"),
+                                html.Span("最后更新时间: ", className="text-muted"),
+                                html.Span(id="history-last-update", className="fw-bold text-info")
+                            ], className="mt-2 mb-3 p-2 bg-light rounded")
+                        ], width=6)
+                    ]),
+                    # 历史合约列表
+                    html.H4("历史入池合约列表"),
+                    html.Div(id="history-contracts-table", className="mb-4"),
+                    # 历史详情弹窗
+                    dbc.Modal([
+                        dbc.ModalHeader(dbc.ModalTitle(id="history-modal-title")),
+                        dbc.ModalBody([
+                            html.Div(id="history-contract-stats", className="mb-3"),
+                            dcc.Graph(id="history-contract-graph"),
+                            html.Hr(),
+                            html.H5("历史资金费率详细数据"),
+                            html.Div(id="history-contract-table")
+                        ]),
+                    ], id="history-contract-modal", is_open=False, size="xl"),
+                ], width=12)
+            ])
+        ], label="历史入池合约", tab_id="history-contracts"),
     ]),
     dbc.Toast(id="notification", header="通知", is_open=False, dismissable=True, duration=4000)
 ], fluid=True)
@@ -325,12 +375,13 @@ def build_tables(pool_contracts, candidates, interval="1h", update_time="未知"
         if pool_contracts and len(pool_contracts) > 0:
             pool_table_header = [html.Thead(html.Tr([
                 html.Th("合约名称"), 
-                html.Th("交易所"), 
+                html.Th("资金费率结算周期"), 
                 html.Th("当前资金费率"), 
                 html.Th("上一次结算时间"),
                 html.Th("24小时成交量"),
                 html.Th("标记价格"),
-                html.Th("缓存时间")
+                html.Th("缓存时间"),
+                html.Th("操作")
             ]))]
             pool_table_rows = []
             for contract in pool_contracts:
@@ -338,7 +389,7 @@ def build_tables(pool_contracts, candidates, interval="1h", update_time="未知"
                     # 兼容不同的字段名
                     funding_rate = contract.get("funding_rate") or contract.get("current_funding_rate", 0)
                     funding_time = contract.get("funding_time") or contract.get("next_funding_time", "")
-                    exchange = contract.get("exchange", "binance")
+                    funding_interval = contract.get("funding_interval", "1h")  # 获取结算周期
                     volume_24h = contract.get("volume_24h", 0)
                     mark_price = contract.get("mark_price", 0)
                     
@@ -349,15 +400,27 @@ def build_tables(pool_contracts, candidates, interval="1h", update_time="未知"
                     formatted_volume = f"{float(volume_24h):,.0f}" if volume_24h else "未知"
                     formatted_price = f"${float(mark_price):.4f}" if mark_price else "未知"
                     
+                    # 格式化结算周期显示
+                    interval_display = funding_interval
+                    if funding_interval == "1h":
+                        interval_display = "1小时"
+                    elif funding_interval == "2h":
+                        interval_display = "2小时"
+                    elif funding_interval == "4h":
+                        interval_display = "4小时"
+                    elif funding_interval == "8h":
+                        interval_display = "8小时"
+                    
                     pool_table_rows.append(
                         html.Tr([
                             html.Td(contract.get("symbol", "")),
-                            html.Td(exchange),
+                            html.Td(interval_display),
                             html.Td(f"{float(funding_rate)*100:.4f}%"),
                             html.Td(formatted_time),
                             html.Td(formatted_volume),
                             html.Td(formatted_price),
                             html.Td(update_time),  # 使用全局的update_time
+                            html.Td(dbc.Button("查看历史", id={"type": "view-monitor-history", "index": contract.get("symbol", "")}, size="sm", color="info", className="history-btn", title=f"查看{contract.get('symbol', '')}的监控历史数据")),
                         ])
                     )
                 except Exception as e:
@@ -381,7 +444,7 @@ def build_tables(pool_contracts, candidates, interval="1h", update_time="未知"
             
             candidates_table_header = [html.Thead(html.Tr([
                 html.Th("合约名称"), 
-                html.Th("交易所"), 
+                html.Th("资金费率结算周期"), 
                 funding_rate_header, 
                 html.Th("上一次结算时间"),
                 html.Th("24小时成交量"),
@@ -396,7 +459,7 @@ def build_tables(pool_contracts, candidates, interval="1h", update_time="未知"
                     # 兼容不同的字段名
                     funding_rate = info.get("funding_rate") or info.get("current_funding_rate", 0)
                     funding_time = info.get("funding_time") or info.get("next_funding_time", "")
-                    exchange = info.get("exchange", "binance")
+                    funding_interval = info.get("funding_interval", "1h")  # 获取结算周期
                     volume_24h = info.get("volume_24h", 0)
                     mark_price = info.get("mark_price", 0)
                     
@@ -407,10 +470,21 @@ def build_tables(pool_contracts, candidates, interval="1h", update_time="未知"
                     formatted_volume = f"{float(volume_24h):,.0f}" if volume_24h else "未知"
                     formatted_price = f"${float(mark_price):.4f}" if mark_price else "未知"
                     
+                    # 格式化结算周期显示
+                    interval_display = funding_interval
+                    if funding_interval == "1h":
+                        interval_display = "1小时"
+                    elif funding_interval == "2h":
+                        interval_display = "2小时"
+                    elif funding_interval == "4h":
+                        interval_display = "4小时"
+                    elif funding_interval == "8h":
+                        interval_display = "8小时"
+                    
                     candidates_table_rows.append(
                         html.Tr([
                             html.Td(symbol),
-                            html.Td(exchange),
+                            html.Td(interval_display),
                             html.Td(f"{float(funding_rate)*100:.4f}%"),
                             html.Td(formatted_time),
                             html.Td(formatted_volume),
@@ -447,12 +521,13 @@ def build_tables(pool_contracts, candidates, interval="1h", update_time="未知"
     Output("history-rate-graph", "figure"),
     Output("history-rate-table", "children"),
     [
-        Input({"type": "view-history", "index": dash.ALL}, "n_clicks")
+        Input({"type": "view-history", "index": dash.ALL}, "n_clicks"),
+        Input({"type": "view-monitor-history", "index": dash.ALL}, "n_clicks")
     ],
     [State("history-rate-modal", "is_open")],
     prevent_initial_call=True
 )
-def open_history_modal(n_clicks, is_open):
+def open_history_modal(n_clicks_history, n_clicks_monitor_history, is_open):
     ctx = callback_context
     
     if not ctx.triggered:
@@ -461,19 +536,35 @@ def open_history_modal(n_clicks, is_open):
     triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
     
     # 检查是否真的是历史按钮被点击
-    if not ('"type":"view-history"' in triggered_id and '"index":' in triggered_id):
+    is_history_click = '"type":"view-history"' in triggered_id and '"index":' in triggered_id
+    is_monitor_history_click = '"type":"view-monitor-history"' in triggered_id and '"index":' in triggered_id
+    
+    if not (is_history_click or is_monitor_history_click):
         return False, "", {}, ""
     
     # 检查是否有实际的点击事件
-    if not any(n_clicks):
+    all_clicks = n_clicks_history + n_clicks_monitor_history
+    if not any(all_clicks):
         return False, "", {}, ""
     
     # 找到被点击的按钮索引
     clicked_index = None
-    for i, clicks in enumerate(n_clicks):
+    button_type = None
+    
+    # 检查普通历史按钮
+    for i, clicks in enumerate(n_clicks_history):
         if clicks and clicks > 0:
             clicked_index = i
+            button_type = "view-history"
             break
+    
+    # 检查监控历史按钮
+    if clicked_index is None:
+        for i, clicks in enumerate(n_clicks_monitor_history):
+            if clicks and clicks > 0:
+                clicked_index = i
+                button_type = "view-monitor-history"
+                break
     
     if clicked_index is None:
         return False, "", {}, ""
@@ -485,18 +576,139 @@ def open_history_modal(n_clicks, is_open):
         if not symbol:
             return False, "", {}, ""
         
-        # 调用API获取历史数据
-        resp = requests.get(f"{API_BASE_URL}/funding_rates?symbol={symbol}")
-        if resp.status_code != 200:
-            error_msg = f"无法获取历史数据: {resp.text}"
-            print(f"❌ {error_msg}")
-            return not is_open, f"{symbol} 历史资金费率", {}, error_msg
+        # 根据按钮类型调用不同的API
+        if button_type == "view-monitor-history":
+            # 调用监控合约历史数据API
+            resp = requests.get(f"{API_BASE_URL}/funding_monitor/history/{symbol}?days=7")
+            if resp.status_code != 200:
+                error_msg = f"无法获取监控历史数据: {resp.text}"
+                print(f"❌ {error_msg}")
+                return not is_open, f"{symbol} 监控历史数据", {}, error_msg
 
-        data = resp.json()
-        funding_rates = data.get("funding_rate", [])
+            data = resp.json()
+            if data.get("status") != "success":
+                error_msg = data.get("message", "获取监控历史数据失败")
+                print(f"❌ {error_msg}")
+                return not is_open, f"{symbol} 监控历史数据", {}, error_msg
 
-        if not funding_rates:
-            return not is_open, f"{symbol} 历史资金费率", {}, "暂无历史数据"
+            history_data = data.get("history", [])
+            if not history_data:
+                return not is_open, f"{symbol} 监控历史数据", {}, "暂无监控历史数据"
+            
+            # 处理监控历史数据
+            dates = []
+            funding_rates = []
+            mark_prices = []
+            index_prices = []
+            
+            for record in history_data:
+                try:
+                    # 解析时间戳
+                    timestamp = record.get('timestamp', '')
+                    if timestamp:
+                        if 'T' in timestamp:
+                            dt = datetime.fromisoformat(timestamp)
+                        else:
+                            dt = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
+                        dates.append(dt.strftime('%Y-%m-%d %H:%M'))
+                    else:
+                        dates.append('未知时间')
+                    
+                    funding_rates.append(float(record.get('funding_rate', 0)) * 100)  # 转换为百分比
+                    mark_prices.append(float(record.get('mark_price', 0)))
+                    index_prices.append(float(record.get('index_price', 0)))
+                except Exception as e:
+                    print(f"⚠️ 处理历史记录时出错: {e}")
+                    continue
+            
+            # 创建图表
+            fig = {
+                'data': [
+                    {
+                        'x': dates,
+                        'y': funding_rates,
+                        'type': 'scatter',
+                        'mode': 'lines+markers',
+                        'name': '资金费率 (%)',
+                        'yaxis': 'y'
+                    },
+                    {
+                        'x': dates,
+                        'y': mark_prices,
+                        'type': 'scatter',
+                        'mode': 'lines+markers',
+                        'name': '标记价格',
+                        'yaxis': 'y2'
+                    },
+                    {
+                        'x': dates,
+                        'y': index_prices,
+                        'type': 'scatter',
+                        'mode': 'lines+markers',
+                        'name': '指数价格',
+                        'yaxis': 'y2'
+                    }
+                ],
+                'layout': {
+                    'title': f'{symbol} 监控历史数据',
+                    'xaxis': {'title': '时间'},
+                    'yaxis': {'title': '资金费率 (%)', 'side': 'left'},
+                    'yaxis2': {'title': '价格', 'side': 'right', 'overlaying': 'y'},
+                    'hovermode': 'closest'
+                }
+            }
+            
+            # 创建表格
+            table_rows = []
+            for i, record in enumerate(history_data):
+                try:
+                    timestamp = record.get('timestamp', '')
+                    if timestamp:
+                        if 'T' in timestamp:
+                            dt = datetime.fromisoformat(timestamp)
+                        else:
+                            dt = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
+                        formatted_time = dt.strftime('%Y-%m-%d %H:%M:%S')
+                    else:
+                        formatted_time = '未知时间'
+                    
+                    table_rows.append(html.Tr([
+                        html.Td(formatted_time),
+                        html.Td(f"{float(record.get('funding_rate', 0)) * 100:.4f}%"),
+                        html.Td(f"${float(record.get('mark_price', 0)):.4f}"),
+                        html.Td(f"${float(record.get('index_price', 0)):.4f}"),
+                        html.Td(record.get('data_source', 'unknown'))
+                    ]))
+                except Exception as e:
+                    print(f"⚠️ 创建表格行时出错: {e}")
+                    continue
+            
+            table_header = html.Thead(html.Tr([
+                html.Th("时间"),
+                html.Th("资金费率"),
+                html.Th("标记价格"),
+                html.Th("指数价格"),
+                html.Th("数据来源")
+            ]))
+            
+            table = dbc.Table([table_header, html.Tbody(table_rows)], bordered=True, hover=True)
+            
+            print(f"✅ 监控历史数据准备完成，图表数据: {len(dates)} 点，表格行数: {len(table_rows)}")
+            return not is_open, f"{symbol} 监控历史数据", fig, table
+            
+        else:
+            # 调用原有的历史数据API
+            resp = requests.get(f"{API_BASE_URL}/funding_rates?symbol={symbol}")
+            if resp.status_code != 200:
+                error_msg = f"无法获取历史数据: {resp.text}"
+                print(f"❌ {error_msg}")
+                return not is_open, f"{symbol} 历史资金费率", {}, error_msg
+
+            data = resp.json()
+            funding_rates = data.get("funding_rate", [])
+
+            if not funding_rates:
+                return not is_open, f"{symbol} 历史资金费率", {}, "暂无历史数据"
 
         # 准备图表数据 - 双Y轴显示资金费率和价格
         dates = [item.get("funding_time") for item in funding_rates]
@@ -898,6 +1110,281 @@ def sort_candidates_by_funding_rate(asc_clicks, desc_clicks, current_interval):
         print(f"❌ 排序异常: {error_msg}")
         print(f"❌ 异常详情: {traceback.format_exc()}")
         return dash.no_update, f"排序失败: {error_msg}", "排序失败"
+
+# 历史入池合约相关回调函数
+
+@app.callback(
+    [Output("history-contracts-count", "children"),
+     Output("history-last-update", "children"),
+     Output("history-contracts-table", "children")],
+    [Input("refresh-history-btn", "n_clicks"),
+     Input("page-store", "data"),
+     Input("history-interval", "n_intervals")],  # 添加自动刷新输入
+    prevent_initial_call=False
+)
+def load_history_contracts(refresh_clicks, page_data, interval_n):
+    """加载历史入池合约列表"""
+    try:
+        # 调用API获取历史合约列表
+        response = requests.get(f"{API_BASE_URL}/funding_monitor/history-contracts")
+        if response.status_code != 200:
+            error_msg = f"获取历史合约列表失败: {response.text}"
+            print(f"❌ Web界面: {error_msg}")
+            return "0", "未知", html.P(error_msg, className="text-danger")
+        
+        data = response.json()
+        contracts = data.get('contracts', [])
+        timestamp = data.get('timestamp', '')
+        
+        # 格式化时间
+        try:
+            from datetime import datetime
+            if timestamp:
+                dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                formatted_time = dt.strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                formatted_time = "未知"
+        except Exception as e:
+            print(f"⚠️ 时间格式化失败: {e}")
+            formatted_time = timestamp
+        
+        # 构建历史合约表格
+        if contracts:
+            history_table_header = [html.Thead(html.Tr([
+                html.Th("合约名称"),
+                html.Th("创建时间"),
+                html.Th("记录总数"),
+                html.Th("时间范围"),
+                html.Th("资金费率统计"),
+                html.Th("价格统计"),
+                html.Th("最后记录"),
+                html.Th("操作")
+            ]))]
+            
+            history_table_rows = []
+            for contract in contracts:
+                try:
+                    # 格式化时间范围
+                    start_time = contract.get('start_time', '')
+                    end_time = contract.get('end_time', '')
+                    time_range = f"{start_time[:10]} ~ {end_time[:10]}" if start_time and end_time else "未知"
+                    
+                    # 格式化资金费率统计
+                    max_rate = contract.get('max_funding_rate', 0)
+                    min_rate = contract.get('min_funding_rate', 0)
+                    avg_rate = contract.get('avg_funding_rate', 0)
+                    funding_stats = f"最高: {max_rate*100:.4f}%<br/>最低: {min_rate*100:.4f}%<br/>平均: {avg_rate*100:.4f}%"
+                    
+                    # 格式化价格统计
+                    max_price = contract.get('max_price', 0)
+                    min_price = contract.get('min_price', 0)
+                    avg_price = contract.get('avg_price', 0)
+                    price_stats = f"最高: ${max_price:.4f}<br/>最低: ${min_price:.4f}<br/>平均: ${avg_price:.4f}"
+                    
+                    # 格式化最后记录
+                    last_rate = contract.get('last_funding_rate', 0)
+                    last_price = contract.get('last_mark_price', 0)
+                    last_record = f"费率: {last_rate*100:.4f}%<br/>价格: ${last_price:.4f}"
+                    
+                    history_table_rows.append(
+                        html.Tr([
+                            html.Td(contract.get('symbol', '')),
+                            html.Td(contract.get('created_time', '')[:10] if contract.get('created_time') else '未知'),
+                            html.Td(contract.get('total_records', 0)),
+                            html.Td(time_range),
+                            html.Td(html.Div(funding_stats)),
+                            html.Td(html.Div(price_stats)),
+                            html.Td(html.Div(last_record)),
+                            html.Td(dbc.Button("查看详情", id={"type": "view-history-detail", "index": contract.get('symbol', '')}, size="sm", color="info", className="history-detail-btn", title=f"查看{contract.get('symbol', '')}的历史资金费率详情")),
+                        ])
+                    )
+                except Exception as e:
+                    print(f"⚠️ 处理历史合约 {contract.get('symbol', '')} 时出错: {e}")
+                    continue
+            
+            history_table = dbc.Table(history_table_header + [html.Tbody(history_table_rows)], bordered=True, hover=True, responsive=True)
+        else:
+            history_table = html.P("暂无历史入池合约数据", className="text-muted")
+        
+        return str(len(contracts)), formatted_time, history_table
+        
+    except Exception as e:
+        error_msg = f"加载历史合约列表失败: {e}"
+        print(f"❌ Web界面: {error_msg}")
+        return "0", "未知", html.P(error_msg, className="text-danger")
+
+@app.callback(
+    [Output("history-contract-modal", "is_open"),
+     Output("history-modal-title", "children"),
+     Output("history-contract-stats", "children"),
+     Output("history-contract-graph", "figure"),
+     Output("history-contract-table", "children")],
+    [Input({"type": "view-history-detail", "index": dash.ALL}, "n_clicks")],
+    [State("history-contract-modal", "is_open")],
+    prevent_initial_call=True
+)
+def open_history_contract_modal(n_clicks_list, is_open):
+    """打开历史合约详情弹窗"""
+    if not any(n_clicks_list):
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+    
+    # 获取被点击的合约
+    ctx = callback_context
+    if not ctx.triggered:
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+    
+    triggered_id = ctx.triggered[0]['prop_id']
+    if 'n_clicks' not in triggered_id:
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+    
+    # 解析合约名称
+    try:
+        import json
+        button_id = json.loads(triggered_id.split('.')[0])
+        symbol = button_id['index']
+    except:
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+    
+    try:
+        # 调用API获取合约历史详情
+        response = requests.get(f"{API_BASE_URL}/funding_monitor/history-contract/{symbol}")
+        if response.status_code != 200:
+            error_msg = f"获取合约 {symbol} 历史详情失败: {response.text}"
+            print(f"❌ Web界面: {error_msg}")
+            return not is_open, f"错误 - {symbol}", html.P(error_msg, className="text-danger"), {}, html.P(error_msg, className="text-danger")
+        
+        data = response.json()
+        history_records = data.get('history', [])
+        created_time = data.get('created_time', '')
+        total_records = data.get('total_records', 0)
+        
+        if not history_records:
+            return not is_open, f"{symbol} - 历史详情", html.P("暂无历史数据", className="text-muted"), {}, html.P("暂无历史数据", className="text-muted")
+        
+        # 构建统计信息
+        funding_rates = [record['funding_rate'] for record in history_records]
+        mark_prices = [record['mark_price'] for record in history_records]
+        
+        max_rate = max(funding_rates)
+        min_rate = min(funding_rates)
+        avg_rate = sum(funding_rates) / len(funding_rates)
+        
+        max_price = max(mark_prices)
+        min_price = min(mark_prices)
+        avg_price = sum(mark_prices) / len(mark_prices)
+        
+        stats_html = dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.H6("资金费率统计", className="card-title"),
+                        html.P(f"最高: {max_rate*100:.4f}%", className="mb-1"),
+                        html.P(f"最低: {min_rate*100:.4f}%", className="mb-1"),
+                        html.P(f"平均: {avg_rate*100:.4f}%", className="mb-0"),
+                    ])
+                ], color="primary", outline=True)
+            ], width=3),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.H6("价格统计", className="card-title"),
+                        html.P(f"最高: ${max_price:.4f}", className="mb-1"),
+                        html.P(f"最低: ${min_price:.4f}", className="mb-1"),
+                        html.P(f"平均: ${avg_price:.4f}", className="mb-0"),
+                    ])
+                ], color="success", outline=True)
+            ], width=3),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.H6("记录统计", className="card-title"),
+                        html.P(f"总记录数: {total_records}", className="mb-1"),
+                        html.P(f"创建时间: {created_time[:10] if created_time else '未知'}", className="mb-1"),
+                        html.P(f"数据源: 历史记录", className="mb-0"),
+                    ])
+                ], color="info", outline=True)
+            ], width=6)
+        ])
+        
+        # 构建图表
+        timestamps = [record['timestamp'] for record in history_records]
+        funding_rates = [record['funding_rate'] for record in history_records]
+        mark_prices = [record['mark_price'] for record in history_records]
+        
+        # 创建图表
+        fig = make_subplots(
+            rows=2, cols=1,
+            subplot_titles=(f'{symbol} 历史资金费率', f'{symbol} 历史标记价格'),
+            vertical_spacing=0.1
+        )
+        
+        # 添加资金费率线
+        fig.add_trace(
+            go.Scatter(
+                x=timestamps,
+                y=[rate * 100 for rate in funding_rates],
+                mode='lines+markers',
+                name='资金费率 (%)',
+                line=dict(color='blue', width=2),
+                marker=dict(size=4)
+            ),
+            row=1, col=1
+        )
+        
+        # 添加价格线
+        fig.add_trace(
+            go.Scatter(
+                x=timestamps,
+                y=mark_prices,
+                mode='lines+markers',
+                name='标记价格 ($)',
+                line=dict(color='green', width=2),
+                marker=dict(size=4)
+            ),
+            row=2, col=1
+        )
+        
+        fig.update_layout(
+            height=600,
+            showlegend=True,
+            title=f"{symbol} 历史数据图表"
+        )
+        
+        fig.update_xaxes(title_text="时间", row=2, col=1)
+        fig.update_yaxes(title_text="资金费率 (%)", row=1, col=1)
+        fig.update_yaxes(title_text="价格 ($)", row=2, col=1)
+        
+        # 构建详细数据表格
+        history_table_header = [html.Thead(html.Tr([
+            html.Th("时间"),
+            html.Th("资金费率"),
+            html.Th("标记价格"),
+            html.Th("指数价格"),
+            html.Th("数据源"),
+            html.Th("更新时间")
+        ]))]
+        
+        history_table_rows = []
+        for record in history_records:
+            history_table_rows.append(
+                html.Tr([
+                    html.Td(record.get('timestamp', '')[:19] if record.get('timestamp') else '未知'),
+                    html.Td(f"{record.get('funding_rate', 0)*100:.4f}%"),
+                    html.Td(f"${record.get('mark_price', 0):.4f}"),
+                    html.Td(f"${record.get('index_price', 0):.4f}"),
+                    html.Td(record.get('data_source', 'unknown')),
+                    html.Td(record.get('last_updated', '')[:19] if record.get('last_updated') else '未知')
+                ])
+            )
+        
+        history_table = dbc.Table(history_table_header + [html.Tbody(history_table_rows)], bordered=True, hover=True, responsive=True, size="sm")
+        
+        return not is_open, f"{symbol} - 历史详情", stats_html, fig, history_table
+        
+    except Exception as e:
+        error_msg = f"获取合约 {symbol} 历史详情失败: {e}"
+        print(f"❌ Web界面: {error_msg}")
+        return not is_open, f"错误 - {symbol}", html.P(error_msg, className="text-danger"), {}, html.P(error_msg, className="text-danger")
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8050)

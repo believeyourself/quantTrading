@@ -1,0 +1,142 @@
+{
+  "symbol": "ESPORTSUSDT",
+  "created_time": "2025-09-04T16:38:55.005568",
+  "history": [
+    {
+      "timestamp": "2025-09-04T16:38:55.005568",
+      "funding_rate": -0.00309987,
+      "mark_price": 0.13200079,
+      "index_price": "0.13212729",
+      "last_updated": "2025-09-04T16:38:45.816183",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-04T16:49:13.950766",
+      "funding_rate": -0.00312419,
+      "mark_price": 0.12941,
+      "index_price": "0.13003150",
+      "last_updated": "2025-09-04T16:49:06.083785",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-04T17:00:00.207970",
+      "funding_rate": -0.00311001,
+      "mark_price": 0.12654,
+      "index_price": "0.12692441",
+      "last_updated": "2025-09-04T16:59:51.468906",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-04T17:10:15.230852",
+      "funding_rate": -0.00317325,
+      "mark_price": 0.12613,
+      "index_price": "0.12689819",
+      "last_updated": "2025-09-04T17:10:07.326614",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-04T17:21:02.426988",
+      "funding_rate": -0.00318635,
+      "mark_price": 0.12272683,
+      "index_price": "0.12391522",
+      "last_updated": "2025-09-04T17:20:53.781784",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-04T17:31:36.556038",
+      "funding_rate": -0.00342917,
+      "mark_price": 0.11507,
+      "index_price": "0.11550288",
+      "last_updated": "2025-09-04T17:31:27.346414",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-04T17:41:53.642112",
+      "funding_rate": -0.00348925,
+      "mark_price": 0.11142023,
+      "index_price": "0.11191061",
+      "last_updated": "2025-09-04T17:41:46.150423",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-04T17:52:42.461417",
+      "funding_rate": -0.00361616,
+      "mark_price": 0.11431974,
+      "index_price": "0.11488621",
+      "last_updated": "2025-09-04T17:52:33.564444",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-04T18:03:02.493049",
+      "funding_rate": -0.00360061,
+      "mark_price": 0.11428924,
+      "index_price": "0.11445006",
+      "last_updated": "2025-09-04T18:02:54.280886",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-04T18:13:30.735455",
+      "funding_rate": -0.0034654,
+      "mark_price": 0.11471,
+      "index_price": "0.11498216",
+      "last_updated": "2025-09-04T18:13:22.855335",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-04T18:24:13.808430",
+      "funding_rate": -0.00330366,
+      "mark_price": 0.11561,
+      "index_price": "0.11593426",
+      "last_updated": "2025-09-04T18:24:05.334851",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-04T18:34:48.567868",
+      "funding_rate": -0.00312363,
+      "mark_price": 0.11553,
+      "index_price": "0.11567364",
+      "last_updated": "2025-09-04T18:34:39.819790",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-04T18:45:05.752388",
+      "funding_rate": -0.00291329,
+      "mark_price": 0.11523714,
+      "index_price": "0.11549835",
+      "last_updated": "2025-09-04T18:44:57.950645",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-04T18:55:51.791581",
+      "funding_rate": -0.00267781,
+      "mark_price": 0.11630272,
+      "index_price": "0.11654012",
+      "last_updated": "2025-09-04T18:55:42.972449",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-04T19:06:27.483974",
+      "funding_rate": -0.00244414,
+      "mark_price": 0.11537664,
+      "index_price": "0.11561751",
+      "last_updated": "2025-09-04T19:06:18.928940",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-04T19:16:58.334213",
+      "funding_rate": -0.00221503,
+      "mark_price": 0.1187,
+      "index_price": "0.11896744",
+      "last_updated": "2025-09-04T19:16:49.933926",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-04T19:27:16.455987",
+      "funding_rate": -0.00197206,
+      "mark_price": 0.1156643,
+      "index_price": "0.11571861",
+      "last_updated": "2025-09-04T19:27:08.945488",
+      "data_source": "real_time"
+    }
+  ]
+}

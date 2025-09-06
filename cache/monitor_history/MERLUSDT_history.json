@@ -1,0 +1,110 @@
+{
+  "symbol": "MERLUSDT",
+  "created_time": "2025-09-03T22:33:35.272723",
+  "history": [
+    {
+      "timestamp": "2025-09-03T22:33:35.272723",
+      "funding_rate": -0.0022957,
+      "mark_price": 0.14898,
+      "index_price": "0.14968864",
+      "last_updated": "2025-09-03T22:33:13.107399",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-03T22:44:24.822257",
+      "funding_rate": -0.00244501,
+      "mark_price": 0.14985,
+      "index_price": "0.15054868",
+      "last_updated": "2025-09-03T22:43:57.699568",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-03T22:55:39.148651",
+      "funding_rate": -0.00268525,
+      "mark_price": 0.1512,
+      "index_price": "0.15166161",
+      "last_updated": "2025-09-03T22:55:10.166054",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-03T23:05:47.560329",
+      "funding_rate": -0.00270618,
+      "mark_price": 0.15401145,
+      "index_price": "0.15453917",
+      "last_updated": "2025-09-03T23:05:23.832199",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-03T23:16:11.331761",
+      "funding_rate": -0.00269407,
+      "mark_price": 0.15116,
+      "index_price": "0.15162388",
+      "last_updated": "2025-09-03T23:15:41.401167",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-03T23:26:59.500515",
+      "funding_rate": -0.002679,
+      "mark_price": 0.14913478,
+      "index_price": "0.14932457",
+      "last_updated": "2025-09-03T23:26:29.802941",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-03T23:37:20.703180",
+      "funding_rate": -0.00254613,
+      "mark_price": 0.14894,
+      "index_price": "0.14904939",
+      "last_updated": "2025-09-03T23:36:55.461503",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-03T23:47:41.928312",
+      "funding_rate": -0.00236028,
+      "mark_price": 0.15107,
+      "index_price": "0.15115090",
+      "last_updated": "2025-09-03T23:47:16.266457",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-03T23:58:26.887446",
+      "funding_rate": -0.00217652,
+      "mark_price": 0.1501,
+      "index_price": "0.15037334",
+      "last_updated": "2025-09-03T23:58:01.663121",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-04T00:09:16.506224",
+      "funding_rate": -0.00205744,
+      "mark_price": 0.15167344,
+      "index_price": "0.15212828",
+      "last_updated": "2025-09-04T00:08:48.769058",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-04T00:18:55.375666",
+      "funding_rate": -0.00204657,
+      "mark_price": 0.15634579,
+      "index_price": "0.15695029",
+      "last_updated": "2025-09-04T00:18:34.480838",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-04T00:29:52.383784",
+      "funding_rate": -0.00203799,
+      "mark_price": 0.15507923,
+      "index_price": "0.15564371",
+      "last_updated": "2025-09-04T00:29:27.284162",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-09-04T00:40:16.152831",
+      "funding_rate": -0.0019752,
+      "mark_price": 0.15849,
+      "index_price": "0.15879029",
+      "last_updated": "2025-09-04T00:39:50.182625",
+      "data_source": "real_time"
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "symbol": "BTCUSDT",
+  "created_time": "2025-08-31T23:30:05.400284",
+  "history": [
+    {
+      "timestamp": "2025-08-31T23:30:05.400306",
+      "funding_rate": 0.001,
+      "mark_price": 50000,
+      "index_price": 50001,
+      "last_updated": "2025-08-31T23:30:05.400306",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-08-31T22:30:05.400317",
+      "funding_rate": 0.0011,
+      "mark_price": 50100,
+      "index_price": 50101,
+      "last_updated": "2025-08-31T22:30:05.400317",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-08-31T21:30:05.400324",
+      "funding_rate": 0.0012000000000000001,
+      "mark_price": 50200,
+      "index_price": 50201,
+      "last_updated": "2025-08-31T21:30:05.400324",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-08-31T20:30:05.400329",
+      "funding_rate": 0.0013,
+      "mark_price": 50300,
+      "index_price": 50301,
+      "last_updated": "2025-08-31T20:30:05.400329",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-08-31T19:30:05.400333",
+      "funding_rate": 0.0014,
+      "mark_price": 50400,
+      "index_price": 50401,
+      "last_updated": "2025-08-31T19:30:05.400333",
+      "data_source": "real_time"
+    },
+    {
+      "timestamp": "2025-08-31T18:30:05.400338",
+      "funding_rate": 0.0015,
+      "mark_price": 50500,
+      "index_price": 50501,
+      "last_updated": "2025-08-31T18:30:05.400338",
+      "data_source": "real_time"
+    }
+  ]
+}

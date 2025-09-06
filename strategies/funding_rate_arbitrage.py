@@ -58,6 +58,29 @@ class FundingRateMonitor(BaseStrategy):
         self._stop_event = threading.Event()
         self._scheduler_thread = None
         
+        # 监控状态跟踪
+        self.task_stats = {
+            'contract_refresh': {
+                'last_success': None,
+                'last_failure': None,
+                'success_count': 0,
+                'failure_count': 0,
+                'consecutive_failures': 0
+            },
+            'funding_rate_check': {
+                'last_success': None,
+                'last_failure': None,
+                'success_count': 0,
+                'failure_count': 0,
+                'consecutive_failures': 0
+            }
+        }
+        
+        # 健康检查阈值
+        self.max_consecutive_failures = 5  # 最大连续失败次数
+        self.health_check_interval = 300  # 健康检查间隔（秒）
+        self.last_health_check = None
+        
         os.makedirs("cache", exist_ok=True)
         self._load_cache(load_on_startup=True) # 启动时加载缓存
         # 不立即启动更新线程，等待策略启动时再启动
@@ -341,70 +364,173 @@ class FundingRateMonitor(BaseStrategy):
             print(f"❌ 刷新合约池失败: {e}")
 
     def check_funding_rates(self):
-        """检查资金费率并发送通知 - 使用统一的API端点"""
+        """检查资金费率并发送通知 - 使用异步API接口"""
         try:
-            print("🔄 定时任务: 开始检查资金费率...")
+            print("🔄 定时任务: 开始检查资金费率（使用异步API）...")
             
-            # 调用统一的API端点获取最新资金费率
-            try:
-                import requests
-                api_url = "http://localhost:8000/funding_monitor/latest-rates"
-                response = requests.get(api_url, timeout=30)
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    contracts = data.get('contracts', {})
-                    real_time_count = data.get('real_time_count', 0)
-                    cached_count = data.get('cached_count', 0)
-                    
-                    print(f"✅ 定时任务: 成功获取最新资金费率数据")
-                    print(f"📊 合约数量: {len(contracts)}, 实时: {real_time_count}, 缓存: {cached_count}")
-                    
-                    # 不再发送资金费率警告，避免与入池出池通知重复
-                    # 资金费率警告现在由API的入池出池逻辑统一处理
-                    print(f"✅ 定时任务: 资金费率数据已获取，共 {len(contracts)} 个合约")
-                    
-                    # 更新本地缓存数据
-                    self.cached_contracts = contracts
-                    self.last_update_time = datetime.now()
-                    print(f"💾 定时任务: 本地缓存已更新")
-                    
-                    # 同时更新现有合约池中合约的最新资金费率
-                    self.update_existing_contracts_funding_rates()
-                    
-                else:
-                    print(f"❌ 定时任务: API调用失败，状态码: {response.status_code}")
-                    
-            except requests.exceptions.ConnectionError:
-                print("❌ 定时任务: 无法连接到API服务器，使用现有缓存数据")
-                self._check_existing_cache()
-            except requests.exceptions.Timeout:
-                print("❌ 定时任务: API请求超时，使用现有缓存数据")
-                self._check_existing_cache()
-            except Exception as e:
-                print(f"❌ 定时任务: API调用异常: {e}")
-                # API异常时，使用现有缓存数据进行检查
-                self._check_existing_cache()
+            # 调用异步API接口
+            success = self._call_async_api()
+            
+            if success:
+                print("✅ 定时任务: 异步任务提交成功")
+                self._update_task_stats('funding_rate_check', success=True)
+            else:
+                print("❌ 定时任务: 异步任务提交失败")
+                self._update_task_stats('funding_rate_check', success=False, error="异步任务提交失败")
+            
+            # 检查健康状态
+            self._check_health_status('funding_rate_check')
             
             print("✅ 定时任务: 资金费率检查完成")
             
         except Exception as e:
-            print(f"❌ 定时任务: 检查资金费率失败: {e}")
+            print(f"❌ 定时任务: 检查资金费率异常: {e}")
+            self._update_task_stats('funding_rate_check', success=False, error=str(e))
+            self._check_health_status('funding_rate_check')
+    
+    def _call_async_api(self):
+        """调用异步API接口"""
+        try:
+            import requests
+            
+            # 调用异步接口
+            api_url = "http://localhost:8000/funding_monitor/latest-rates-async?fast_mode=true&cache_only=true"
+            
+            response = requests.get(api_url, timeout=10)  # 10秒超时足够
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('status') == 'success':
+                    task_id = data.get('task_id')
+                    print(f"✅ 异步任务已提交，任务ID: {task_id}")
+                    return True
+                else:
+                    print(f"❌ 异步任务提交失败: {data.get('message', '未知错误')}")
+                    return False
+            else:
+                print(f"❌ API调用失败: {response.status_code}")
+                return False
+                
+        except requests.exceptions.Timeout:
+            print("❌ API调用超时")
+            return False
+        except requests.exceptions.ConnectionError:
+            print("❌ 无法连接到API服务器")
+            return False
+        except Exception as e:
+            print(f"❌ API调用异常: {e}")
+            return False
 
     def _check_existing_cache(self):
         """使用现有缓存数据检查资金费率（备用方案）"""
         try:
             print("🔄 定时任务: 使用现有缓存数据进行检查...")
             
+            # 检查缓存状态
+            cache_status = self._get_cache_status()
+            print(f"📊 定时任务(缓存): 缓存状态 - {cache_status}")
+            
             if not self._is_cache_valid():
                 print("⚠️ 定时任务: 本地缓存已过期，尝试更新...")
                 self._update_cached_contracts()
+                
+                # 再次检查缓存状态
+                cache_status = self._get_cache_status()
+                print(f"📊 定时任务(缓存): 更新后缓存状态 - {cache_status}")
             
             # 使用统一的资金费率检查逻辑
             self._check_funding_rates_from_cache()
+            
+            # 发送缓存回退通知
+            self._send_cache_fallback_notification(cache_status)
                 
         except Exception as e:
             print(f"❌ 定时任务: 使用缓存数据检查失败: {e}")
+            # 发送错误通知
+            self._send_error_notification(f"缓存回退检查失败: {e}")
+
+    def _get_cache_status(self):
+        """获取缓存状态信息"""
+        try:
+            cache_file = "cache/all_funding_contracts_full.json"
+            if not os.path.exists(cache_file):
+                return "缓存文件不存在"
+            
+            import json
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                cache_data = json.load(f)
+            
+            cache_time = cache_data.get('cache_time', '')
+            if cache_time:
+                from datetime import datetime
+                cache_datetime = datetime.fromisoformat(cache_time)
+                cache_age = (datetime.now() - cache_datetime).total_seconds()
+                
+                contracts_count = 0
+                contracts_by_interval = cache_data.get('contracts_by_interval', {})
+                for interval, contracts in contracts_by_interval.items():
+                    contracts_count += len(contracts)
+                
+                return f"缓存时间: {cache_time}, 年龄: {cache_age/3600:.2f}小时, 合约数: {contracts_count}"
+            else:
+                return "缓存时间信息缺失"
+                
+        except Exception as e:
+            return f"获取缓存状态失败: {e}"
+
+    def _send_cache_fallback_notification(self, cache_status):
+        """发送缓存回退通知"""
+        try:
+            from utils.notifier import send_email_notification
+            
+            subject = "定时任务: API超时，使用缓存数据"
+            message = f"""
+定时任务执行报告:
+
+⚠️ API请求超时，已启用缓存回退机制
+
+📊 缓存状态:
+{cache_status}
+
+🔄 系统状态:
+- 定时任务继续正常运行
+- 使用现有缓存数据进行资金费率检查
+- 建议检查API服务器状态
+
+⏰ 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+            
+            send_email_notification(subject, message)
+            print("📧 定时任务: 缓存回退通知已发送")
+            
+        except Exception as e:
+            print(f"❌ 定时任务: 发送缓存回退通知失败: {e}")
+
+    def _send_error_notification(self, error_message):
+        """发送错误通知"""
+        try:
+            from utils.notifier import send_email_notification
+            
+            subject = "定时任务: 系统错误"
+            message = f"""
+定时任务错误报告:
+
+❌ 错误信息:
+{error_message}
+
+🔄 系统状态:
+- 定时任务遇到错误
+- 请检查系统日志
+- 建议重启服务
+
+⏰ 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+            
+            send_email_notification(subject, message)
+            print("📧 定时任务: 错误通知已发送")
+            
+        except Exception as e:
+            print(f"❌ 定时任务: 发送错误通知失败: {e}")
 
     def _check_funding_rates_from_cache(self):
         """从缓存检查资金费率并发送警告邮件"""
@@ -554,6 +680,118 @@ class FundingRateMonitor(BaseStrategy):
         # 重置状态
         self._update_threads_started = False
         print("✅ 监控系统已停止")
+    
+    def _update_task_stats(self, task_name: str, success: bool, error: str = None):
+        """更新任务统计信息"""
+        try:
+            stats = self.task_stats.get(task_name, {})
+            
+            if success:
+                stats['last_success'] = datetime.now()
+                stats['success_count'] += 1
+                stats['consecutive_failures'] = 0
+            else:
+                stats['last_failure'] = datetime.now()
+                stats['failure_count'] += 1
+                stats['consecutive_failures'] += 1
+                
+                # 记录错误信息
+                if error:
+                    stats['last_error'] = error
+            
+            self.task_stats[task_name] = stats
+            
+        except Exception as e:
+            print(f"❌ 更新任务统计失败: {e}")
+    
+    def _check_health_status(self, task_name: str):
+        """检查任务健康状态"""
+        try:
+            stats = self.task_stats.get(task_name, {})
+            consecutive_failures = stats.get('consecutive_failures', 0)
+            
+            if consecutive_failures >= self.max_consecutive_failures:
+                print(f"⚠️ 定时任务: {task_name} 连续失败 {consecutive_failures} 次，触发健康检查")
+                self._send_health_alert(task_name, consecutive_failures)
+                
+        except Exception as e:
+            print(f"❌ 健康检查失败: {e}")
+    
+    def _send_health_alert(self, task_name: str, consecutive_failures: int):
+        """发送健康警报"""
+        try:
+            from utils.notifier import send_email_notification
+            
+            subject = f"定时任务健康警报: {task_name}"
+            message = f"""
+定时任务健康警报:
+
+⚠️ 任务名称: {task_name}
+❌ 连续失败次数: {consecutive_failures}
+📊 最大允许失败次数: {self.max_consecutive_failures}
+
+🔄 建议操作:
+- 检查API服务器状态
+- 检查网络连接
+- 查看系统日志
+- 考虑重启服务
+
+⏰ 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+            
+            send_email_notification(subject, message)
+            print(f"📧 定时任务: {task_name} 健康警报已发送")
+            
+        except Exception as e:
+            print(f"❌ 定时任务: 发送健康警报失败: {e}")
+    
+    def get_task_stats(self):
+        """获取任务统计信息"""
+        try:
+            stats_summary = {}
+            for task_name, stats in self.task_stats.items():
+                stats_summary[task_name] = {
+                    'last_success': stats.get('last_success').isoformat() if stats.get('last_success') else None,
+                    'last_failure': stats.get('last_failure').isoformat() if stats.get('last_failure') else None,
+                    'success_count': stats.get('success_count', 0),
+                    'failure_count': stats.get('failure_count', 0),
+                    'consecutive_failures': stats.get('consecutive_failures', 0),
+                    'last_error': stats.get('last_error', None)
+                }
+            return stats_summary
+        except Exception as e:
+            print(f"❌ 获取任务统计失败: {e}")
+            return {}
+    
+    def get_health_status(self):
+        """获取系统健康状态"""
+        try:
+            health_status = {
+                'overall_status': 'healthy',
+                'tasks': {},
+                'last_check': datetime.now().isoformat()
+            }
+            
+            for task_name, stats in self.task_stats.items():
+                consecutive_failures = stats.get('consecutive_failures', 0)
+                task_status = 'healthy' if consecutive_failures < self.max_consecutive_failures else 'unhealthy'
+                
+                health_status['tasks'][task_name] = {
+                    'status': task_status,
+                    'consecutive_failures': consecutive_failures,
+                    'max_failures': self.max_consecutive_failures,
+                    'last_success': stats.get('last_success').isoformat() if stats.get('last_success') else None,
+                    'last_failure': stats.get('last_failure').isoformat() if stats.get('last_failure') else None
+                }
+                
+                if task_status == 'unhealthy':
+                    health_status['overall_status'] = 'unhealthy'
+            
+            return health_status
+            
+        except Exception as e:
+            print(f"❌ 获取健康状态失败: {e}")
+            return {'overall_status': 'error', 'error': str(e)}
     
     def get_pool_status(self):
         """获取池子状态"""
