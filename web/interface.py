@@ -257,6 +257,55 @@ app.layout = dbc.Container([
                 ], width=12)
             ])
         ], label="历史入池合约", tab_id="history-contracts"),
+        dbc.Tab([
+            dbc.Row([
+                dbc.Col([
+                    html.H3("合约归档数据"),
+                    html.P("查看合约入池出池的归档数据，分析每次入池出池的特征。", className="text-muted"),
+                    html.Hr(),
+                    dbc.Button("🔄 刷新归档数据", id="refresh-archive-btn", color="info", className="me-2 mb-2"),
+                    dbc.Button("🧹 清理旧归档", id="cleanup-archive-btn", color="warning", className="mb-2"),
+                    # 归档统计
+                    dbc.Row([
+                        dbc.Col([
+                            html.Div([
+                                html.I(className="fas fa-archive me-2"),
+                                html.Span("总会话数: ", className="text-muted"),
+                                html.Span(id="total-sessions-count", className="fw-bold text-primary")
+                            ], className="mt-2 mb-3 p-2 bg-light rounded")
+                        ], width=4),
+                        dbc.Col([
+                            html.Div([
+                                html.I(className="fas fa-chart-line me-2"),
+                                html.Span("总合约数: ", className="text-muted"),
+                                html.Span(id="total-contracts-count", className="fw-bold text-success")
+                            ], className="mt-2 mb-3 p-2 bg-light rounded")
+                        ], width=4),
+                        dbc.Col([
+                            html.Div([
+                                html.I(className="fas fa-clock me-2"),
+                                html.Span("平均持续时间: ", className="text-muted"),
+                                html.Span(id="avg-duration", className="fw-bold text-info")
+                            ], className="mt-2 mb-3 p-2 bg-light rounded")
+                        ], width=4)
+                    ]),
+                    # 归档合约列表
+                    html.H4("归档合约列表"),
+                    html.Div(id="archive-contracts-table", className="mb-4"),
+                    # 归档详情弹窗
+                    dbc.Modal([
+                        dbc.ModalHeader(dbc.ModalTitle(id="archive-modal-title")),
+                        dbc.ModalBody([
+                            html.Div(id="archive-session-stats", className="mb-3"),
+                            dcc.Graph(id="archive-session-graph"),
+                            html.Hr(),
+                            html.H5("会话详细数据"),
+                            html.Div(id="archive-session-table")
+                        ]),
+                    ], id="archive-session-modal", is_open=False, size="xl"),
+                ], width=12)
+            ])
+        ], label="合约归档", tab_id="archive-tab"),
     ]),
     dbc.Toast(id="notification", header="通知", is_open=False, dismissable=True, duration=4000)
 ], fluid=True)
@@ -1173,18 +1222,34 @@ def load_history_contracts(refresh_clicks, page_data, interval_n):
                     max_rate = contract.get('max_funding_rate', 0)
                     min_rate = contract.get('min_funding_rate', 0)
                     avg_rate = contract.get('avg_funding_rate', 0)
-                    funding_stats = f"最高: {max_rate*100:.4f}%<br/>最低: {min_rate*100:.4f}%<br/>平均: {avg_rate*100:.4f}%"
+                    funding_stats = html.Div([
+                        f"最高: {max_rate*100:.4f}%",
+                        html.Br(),
+                        f"最低: {min_rate*100:.4f}%",
+                        html.Br(),
+                        f"平均: {avg_rate*100:.4f}%"
+                    ])
                     
                     # 格式化价格统计
                     max_price = contract.get('max_price', 0)
                     min_price = contract.get('min_price', 0)
                     avg_price = contract.get('avg_price', 0)
-                    price_stats = f"最高: ${max_price:.4f}<br/>最低: ${min_price:.4f}<br/>平均: ${avg_price:.4f}"
+                    price_stats = html.Div([
+                        f"最高: ${max_price:.4f}",
+                        html.Br(),
+                        f"最低: ${min_price:.4f}",
+                        html.Br(),
+                        f"平均: ${avg_price:.4f}"
+                    ])
                     
                     # 格式化最后记录
                     last_rate = contract.get('last_funding_rate', 0)
                     last_price = contract.get('last_mark_price', 0)
-                    last_record = f"费率: {last_rate*100:.4f}%<br/>价格: ${last_price:.4f}"
+                    last_record = html.Div([
+                        f"费率: {last_rate*100:.4f}%",
+                        html.Br(),
+                        f"价格: ${last_price:.4f}"
+                    ])
                     
                     history_table_rows.append(
                         html.Tr([
@@ -1192,9 +1257,9 @@ def load_history_contracts(refresh_clicks, page_data, interval_n):
                             html.Td(contract.get('created_time', '')[:10] if contract.get('created_time') else '未知'),
                             html.Td(contract.get('total_records', 0)),
                             html.Td(time_range),
-                            html.Td(html.Div(funding_stats)),
-                            html.Td(html.Div(price_stats)),
-                            html.Td(html.Div(last_record)),
+                            html.Td(funding_stats),
+                            html.Td(price_stats),
+                            html.Td(last_record),
                             html.Td(dbc.Button("查看详情", id={"type": "view-history-detail", "index": contract.get('symbol', '')}, size="sm", color="info", className="history-detail-btn", title=f"查看{contract.get('symbol', '')}的历史资金费率详情")),
                         ])
                     )
@@ -1385,6 +1450,134 @@ def open_history_contract_modal(n_clicks_list, is_open):
         error_msg = f"获取合约 {symbol} 历史详情失败: {e}"
         print(f"❌ Web界面: {error_msg}")
         return not is_open, f"错误 - {symbol}", html.P(error_msg, className="text-danger"), {}, html.P(error_msg, className="text-danger")
+
+# 归档数据相关回调函数
+
+@app.callback(
+    [Output("total-sessions-count", "children"),
+     Output("total-contracts-count", "children"),
+     Output("avg-duration", "children"),
+     Output("archive-contracts-table", "children")],
+    [Input("refresh-archive-btn", "n_clicks"),
+     Input("page-store", "data")],
+    prevent_initial_call=False
+)
+def load_archive_data(refresh_clicks, page_data):
+    """加载归档数据"""
+    try:
+        # 调用API获取归档统计
+        response = requests.get(f"{API_BASE_URL}/funding_monitor/archive/statistics")
+        if response.status_code != 200:
+            error_msg = f"获取归档统计失败: {response.text}"
+            print(f"❌ Web界面: {error_msg}")
+            return "0", "0", "0分钟", html.P(error_msg, className="text-danger")
+        
+        stats_data = response.json()
+        statistics = stats_data.get('statistics', {})
+        
+        total_sessions = statistics.get('total_sessions', 0)
+        total_contracts = statistics.get('total_contracts', 0)
+        avg_duration = statistics.get('average_duration_minutes', 0)
+        
+        # 格式化平均持续时间
+        if avg_duration >= 60:
+            duration_text = f"{avg_duration/60:.1f}小时"
+        else:
+            duration_text = f"{avg_duration:.0f}分钟"
+        
+        # 获取归档合约列表
+        contracts_response = requests.get(f"{API_BASE_URL}/funding_monitor/archive/contracts")
+        if contracts_response.status_code != 200:
+            contracts_table = html.P("获取归档合约列表失败", className="text-danger")
+        else:
+            contracts_data = contracts_response.json()
+            contracts = contracts_data.get('contracts', [])
+            
+            if contracts:
+                # 构建归档合约表格
+                archive_table_header = [html.Thead(html.Tr([
+                    html.Th("合约名称"),
+                    html.Th("总会话数"),
+                    html.Th("最新入池时间"),
+                    html.Th("最新出池时间"),
+                    html.Th("最新持续时间"),
+                    html.Th("操作")
+                ]))]
+                
+                archive_table_rows = []
+                for contract in contracts:
+                    # 格式化时间
+                    latest_entry_time = contract.get('latest_entry_time', '')
+                    latest_exit_time = contract.get('latest_exit_time', '')
+                    
+                    if latest_entry_time:
+                        try:
+                            from datetime import datetime
+                            dt = datetime.fromisoformat(latest_entry_time.replace('Z', '+00:00'))
+                            formatted_entry_time = dt.strftime('%Y-%m-%d %H:%M')
+                        except:
+                            formatted_entry_time = latest_entry_time[:16]
+                    else:
+                        formatted_entry_time = "未知"
+                    
+                    if latest_exit_time:
+                        try:
+                            dt = datetime.fromisoformat(latest_exit_time.replace('Z', '+00:00'))
+                            formatted_exit_time = dt.strftime('%Y-%m-%d %H:%M')
+                        except:
+                            formatted_exit_time = latest_exit_time[:16]
+                    else:
+                        formatted_exit_time = "进行中"
+                    
+                    # 格式化持续时间
+                    duration_minutes = contract.get('latest_duration_minutes', 0)
+                    if duration_minutes >= 60:
+                        duration_text = f"{duration_minutes/60:.1f}小时"
+                    else:
+                        duration_text = f"{duration_minutes}分钟"
+                    
+                    archive_table_rows.append(
+                        html.Tr([
+                            html.Td(contract.get('symbol', '')),
+                            html.Td(contract.get('total_sessions', 0)),
+                            html.Td(formatted_entry_time),
+                            html.Td(formatted_exit_time),
+                            html.Td(duration_text),
+                            html.Td(dbc.Button("查看会话", id={"type": "view-archive-sessions", "index": contract.get('symbol', '')}, size="sm", color="info", className="archive-sessions-btn", title=f"查看{contract.get('symbol', '')}的所有归档会话")),
+                        ])
+                    )
+                
+                contracts_table = dbc.Table(archive_table_header + [html.Tbody(archive_table_rows)], bordered=True, hover=True, responsive=True)
+            else:
+                contracts_table = html.P("暂无归档合约数据", className="text-muted")
+        
+        return str(total_sessions), str(total_contracts), duration_text, contracts_table
+        
+    except Exception as e:
+        error_msg = f"加载归档数据失败: {e}"
+        print(f"❌ Web界面: {error_msg}")
+        return "0", "0", "0分钟", html.P(error_msg, className="text-danger")
+
+@app.callback(
+    Output("notification", "children", allow_duplicate=True),
+    Output("notification", "is_open", allow_duplicate=True),
+    Input("cleanup-archive-btn", "n_clicks"),
+    prevent_initial_call=True
+)
+def cleanup_archive_data(cleanup_clicks):
+    """清理旧归档数据"""
+    try:
+        response = requests.post(f"{API_BASE_URL}/funding_monitor/archive/cleanup?days_to_keep=30")
+        if response.status_code == 200:
+            data = response.json()
+            message = data.get('message', '归档数据清理完成')
+            return message, True
+        else:
+            error_msg = f"清理归档数据失败: {response.text}"
+            return error_msg, True
+    except Exception as e:
+        error_msg = f"清理归档数据异常: {str(e)}"
+        return error_msg, True
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8050)

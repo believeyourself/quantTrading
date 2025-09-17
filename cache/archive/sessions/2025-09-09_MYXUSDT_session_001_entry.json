@@ -1,0 +1,8 @@
+{
+  "session_id": "2025-09-09_MYXUSDT_session_001",
+  "symbol": "MYXUSDT",
+  "entry_time": "2025-09-09T03:49:49.241306",
+  "entry_reason": "funding_rate_threshold",
+  "status": "active",
+  "created_time": "2025-09-09T03:49:49.241310"
+}

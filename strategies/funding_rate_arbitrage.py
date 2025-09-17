@@ -293,6 +293,15 @@ class FundingRateMonitor(BaseStrategy):
                     removed_contracts_info = []
                     
                     for symbol in removed_contracts:
+                        # 归档合约出池数据
+                        try:
+                            from utils.archive_manager import archive_manager
+                            session_id = archive_manager.archive_contract_exit(symbol, "funding_rate_threshold")
+                            if session_id:
+                                print(f"📁 合约 {symbol} 出池数据已归档，会话ID: {session_id}")
+                        except Exception as e:
+                            print(f"⚠️ 合约 {symbol} 出池归档失败: {e}")
+                        
                         if symbol in self.cached_contracts:
                             info = self.cached_contracts[symbol]
                             funding_rate = info.get('current_funding_rate', 0)
@@ -314,7 +323,12 @@ class FundingRateMonitor(BaseStrategy):
                     
                     # 发送邮件通知
                     if removed_contracts_info:
-                        send_pool_change_email([], removed_contracts_info)
+                        print(f"📧 准备发送出池邮件通知: {removed_contracts_info}")
+                        email_success = send_pool_change_email([], removed_contracts_info)
+                        if email_success:
+                            print(f"✅ 出池邮件通知发送成功")
+                        else:
+                            print(f"❌ 出池邮件通知发送失败")
                 else:
                     print(f"⚠️ 首次刷新，跳过出池通知")
             
@@ -328,6 +342,15 @@ class FundingRateMonitor(BaseStrategy):
                     added_contracts_info = []
                     
                     for symbol in added_contracts:
+                        # 记录合约入池信息
+                        try:
+                            from utils.archive_manager import archive_manager
+                            session_id = archive_manager.archive_contract_entry(symbol, "funding_rate_threshold")
+                            if session_id:
+                                print(f"📁 合约 {symbol} 入池记录已保存，会话ID: {session_id}")
+                        except Exception as e:
+                            print(f"⚠️ 合约 {symbol} 入池记录失败: {e}")
+                        
                         if symbol in selected_contracts:
                             info = selected_contracts[symbol]
                             funding_rate = info.get('current_funding_rate', 0)
@@ -349,7 +372,12 @@ class FundingRateMonitor(BaseStrategy):
                     
                     # 发送邮件通知
                     if added_contracts_info:
-                        send_pool_change_email(added_contracts_info, [])
+                        print(f"📧 准备发送入池邮件通知: {added_contracts_info}")
+                        email_success = send_pool_change_email(added_contracts_info, [])
+                        if email_success:
+                            print(f"✅ 入池邮件通知发送成功")
+                        else:
+                            print(f"❌ 入池邮件通知发送失败")
                 else:
                     print(f"⚠️ 首次刷新，跳过入池通知")
             

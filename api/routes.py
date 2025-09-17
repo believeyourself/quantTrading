@@ -1880,50 +1880,117 @@ def get_history_contracts():
         print(f"获取历史合约列表异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取历史合约列表失败: {str(e)}")
 
-@app.get("/funding_monitor/history-contract/{symbol}")
-def get_history_contract_detail(symbol: str):
-    """获取指定合约的历史资金费率详情"""
+@app.get("/funding_monitor/archive/sessions/{symbol}")
+def get_contract_archive_sessions(symbol: str):
+    """获取指定合约的所有归档会话"""
     try:
-        import os
-        import json
-        from datetime import datetime
+        from utils.archive_manager import archive_manager
         
-        history_file = f"cache/monitor_history/{symbol}_history.json"
-        if not os.path.exists(history_file):
-            return {
-                "status": "error",
-                "message": f"合约 {symbol} 的历史数据不存在",
-                "timestamp": datetime.now().isoformat()
-            }
-        
-        with open(history_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        symbol_name = data.get('symbol', symbol)
-        created_time = data.get('created_time', '')
-        history_records = data.get('history', [])
-        
-        # 格式化历史记录
-        formatted_records = []
-        for record in history_records:
-            formatted_records.append({
-                "timestamp": record.get('timestamp', ''),
-                "funding_rate": float(record.get('funding_rate', 0)),
-                "mark_price": float(record.get('mark_price', 0)),
-                "index_price": float(record.get('index_price', 0)),
-                "last_updated": record.get('last_updated', ''),
-                "data_source": record.get('data_source', 'unknown')
-            })
+        sessions = archive_manager.get_contract_sessions(symbol)
         
         return {
             "status": "success",
-            "symbol": symbol_name,
-            "created_time": created_time,
-            "total_records": len(formatted_records),
-            "history": formatted_records,
+            "symbol": symbol,
+            "sessions": sessions,
+            "total_sessions": len(sessions),
             "timestamp": datetime.now().isoformat()
         }
         
     except Exception as e:
-        print(f"获取合约历史详情异常: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"获取合约历史详情失败: {str(e)}")
+        print(f"获取合约 {symbol} 归档会话失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取归档会话失败: {str(e)}")
+
+@app.get("/funding_monitor/archive/session/{session_id}")
+def get_archive_session_detail(session_id: str):
+    """获取指定会话的详细信息"""
+    try:
+        from utils.archive_manager import archive_manager
+        
+        session_detail = archive_manager.get_session_detail(session_id)
+        
+        if not session_detail:
+            raise HTTPException(status_code=404, detail=f"会话 {session_id} 不存在")
+        
+        return {
+            "status": "success",
+            "session": session_detail,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"获取会话 {session_id} 详情失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取会话详情失败: {str(e)}")
+
+@app.get("/funding_monitor/archive/statistics")
+def get_archive_statistics():
+    """获取归档统计信息"""
+    try:
+        from utils.archive_manager import archive_manager
+        
+        statistics = archive_manager.get_archive_statistics()
+        
+        return {
+            "status": "success",
+            "statistics": statistics,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        print(f"获取归档统计失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取归档统计失败: {str(e)}")
+
+@app.post("/funding_monitor/archive/cleanup")
+def cleanup_old_archives(days_to_keep: int = 30):
+    """清理旧的归档数据"""
+    try:
+        from utils.archive_manager import archive_manager
+        
+        archive_manager.cleanup_old_archives(days_to_keep)
+        
+        return {
+            "status": "success",
+            "message": f"已清理超过 {days_to_keep} 天的归档数据",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        print(f"清理归档数据失败: {e}")
+        raise HTTPException(status_code=500, detail=f"清理归档数据失败: {str(e)}")
+
+@app.get("/funding_monitor/archive/contracts")
+def get_archived_contracts():
+    """获取所有有归档数据的合约列表"""
+    try:
+        from utils.archive_manager import archive_manager
+        
+        sessions_summary = archive_manager.sessions_summary
+        contracts = []
+        
+        for symbol, sessions in sessions_summary.items():
+            total_sessions = len(sessions)
+            if sessions:
+                latest_session = max(sessions, key=lambda x: x.get('created_time', ''))
+                contracts.append({
+                    "symbol": symbol,
+                    "total_sessions": total_sessions,
+                    "latest_session_id": latest_session.get('session_id', ''),
+                    "latest_entry_time": latest_session.get('entry_time', ''),
+                    "latest_exit_time": latest_session.get('exit_time', ''),
+                    "latest_duration_minutes": latest_session.get('duration_minutes', 0)
+                })
+        
+        # 按最新入池时间排序
+        contracts.sort(key=lambda x: x['latest_entry_time'], reverse=True)
+        
+        return {
+            "status": "success",
+            "contracts": contracts,
+            "total_contracts": len(contracts),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        print(f"获取归档合约列表失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取归档合约列表失败: {str(e)}")

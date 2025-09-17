@@ -1,0 +1,142 @@
+{
+  "symbol": "NMRUSDT",
+  "created_time": "2025-09-07T20:54:54.824923",
+  "history": [
+    {
+      "timestamp": "2025-09-07T20:54:54.824923",
+      "funding_rate": -0.00577336,
+      "mark_price": 21.09531275,
+      "index_price": "21.17546401",
+      "last_updated": "cached",
+      "data_source": "cached"
+    },
+    {
+      "timestamp": "2025-09-07T21:04:57.576496",
+      "funding_rate": -0.00577336,
+      "mark_price": 21.09531275,
+      "index_price": "21.17546401",
+      "last_updated": "cached",
+      "data_source": "cached"
+    },
+    {
+      "timestamp": "2025-09-07T21:14:59.716224",
+      "funding_rate": -0.00577336,
+      "mark_price": 21.09531275,
+      "index_price": "21.17546401",
+      "last_updated": "cached",
+      "data_source": "cached"
+    },
+    {
+      "timestamp": "2025-09-07T21:25:02.265180",
+      "funding_rate": -0.00577336,
+      "mark_price": 21.09531275,
+      "index_price": "21.17546401",
+      "last_updated": "cached",
+      "data_source": "cached"
+    },
+    {
+      "timestamp": "2025-09-07T21:35:04.421615",
+      "funding_rate": -0.00577336,
+      "mark_price": 21.09531275,
+      "index_price": "21.17546401",
+      "last_updated": "cached",
+      "data_source": "cached"
+    },
+    {
+      "timestamp": "2025-09-07T21:45:06.949953",
+      "funding_rate": -0.00577336,
+      "mark_price": 21.09531275,
+      "index_price": "21.17546401",
+      "last_updated": "cached",
+      "data_source": "cached"
+    },
+    {
+      "timestamp": "2025-09-07T21:55:09.223975",
+      "funding_rate": -0.00577336,
+      "mark_price": 21.09531275,
+      "index_price": "21.17546401",
+      "last_updated": "cached",
+      "data_source": "cached"
+    },
+    {
+      "timestamp": "2025-09-07T22:05:11.890652",
+      "funding_rate": -0.00577336,
+      "mark_price": 21.09531275,
+      "index_price": "21.17546401",
+      "last_updated": "cached",
+      "data_source": "cached"
+    },
+    {
+      "timestamp": "2025-09-07T22:15:14.491456",
+      "funding_rate": -0.00577336,
+      "mark_price": 21.09531275,
+      "index_price": "21.17546401",
+      "last_updated": "cached",
+      "data_source": "cached"
+    },
+    {
+      "timestamp": "2025-09-07T22:25:16.919497",
+      "funding_rate": -0.00577336,
+      "mark_price": 21.09531275,
+      "index_price": "21.17546401",
+      "last_updated": "cached",
+      "data_source": "cached"
+    },
+    {
+      "timestamp": "2025-09-07T22:35:19.409754",
+      "funding_rate": -0.00577336,
+      "mark_price": 21.09531275,
+      "index_price": "21.17546401",
+      "last_updated": "cached",
+      "data_source": "cached"
+    },
+    {
+      "timestamp": "2025-09-07T22:45:21.509769",
+      "funding_rate": -0.00577336,
+      "mark_price": 21.09531275,
+      "index_price": "21.17546401",
+      "last_updated": "cached",
+      "data_source": "cached"
+    },
+    {
+      "timestamp": "2025-09-07T22:55:23.809116",
+      "funding_rate": -0.00577336,
+      "mark_price": 21.09531275,
+      "index_price": "21.17546401",
+      "last_updated": "cached",
+      "data_source": "cached"
+    },
+    {
+      "timestamp": "2025-09-07T23:05:25.905827",
+      "funding_rate": -0.00577336,
+      "mark_price": 21.09531275,
+      "index_price": "21.17546401",
+      "last_updated": "cached",
+      "data_source": "cached"
+    },
+    {
+      "timestamp": "2025-09-07T23:15:27.972704",
+      "funding_rate": -0.00577336,
+      "mark_price": 21.09531275,
+      "index_price": "21.17546401",
+      "last_updated": "cached",
+      "data_source": "cached"
+    },
+    {
+      "timestamp": "2025-09-07T23:25:30.195973",
+      "funding_rate": -0.00577336,
+      "mark_price": 21.09531275,
+      "index_price": "21.17546401",
+      "last_updated": "cached",
+      "data_source": "cached"
+    },
+    {
+      "timestamp": "2025-09-07T23:35:32.354872",
+      "funding_rate": -0.00577336,
+      "mark_price": 21.09531275,
+      "index_price": "21.17546401",
+      "last_updated": "cached",
+      "data_source": "cached"
+    }
+  ]
+}

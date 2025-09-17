@@ -46,6 +46,16 @@ class EmailSender:
     
     def _validate_config(self):
         """验证邮件配置"""
+        print(f"🔍 验证邮件配置...")
+        print(f"   邮件启用状态: {self.enabled}")
+        print(f"   SMTP服务器: {self.smtp_server}")
+        print(f"   SMTP端口: {self.smtp_port}")
+        print(f"   用户名: {self.username}")
+        print(f"   授权码: {'已设置' if self.auth_code else '未设置'}")
+        print(f"   收件人: {self.recipient}")
+        print(f"   使用SSL: {self.use_ssl}")
+        print(f"   使用TLS: {self.use_tls}")
+        
         if not self.enabled:
             print("⚠️ 邮件通知已禁用")
             return False
@@ -352,10 +362,18 @@ def send_funding_rate_warning_email(symbol: str, funding_rate: float, mark_price
 def send_pool_change_email(added_contracts: List[str], removed_contracts: List[str]) -> bool:
     """便捷函数：发送监控池变化邮件"""
     try:
+        print(f"📧 开始发送监控池变化邮件 - 入池: {added_contracts}, 出池: {removed_contracts}")
         email_sender = EmailSender()
-        return email_sender.send_pool_change_notification(added_contracts, removed_contracts)
+        success = email_sender.send_pool_change_notification(added_contracts, removed_contracts)
+        if success:
+            print(f"✅ 监控池变化邮件发送成功")
+        else:
+            print(f"❌ 监控池变化邮件发送失败")
+        return success
     except Exception as e:
-        print(f"❌ 发送监控池变化邮件失败: {e}")
+        print(f"❌ 发送监控池变化邮件异常: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
