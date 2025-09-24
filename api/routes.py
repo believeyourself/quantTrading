@@ -1880,6 +1880,50 @@ def get_history_contracts():
         print(f"获取历史合约列表异常: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取历史合约列表失败: {str(e)}")
 
+@app.get("/funding_monitor/history-contract/{symbol}")
+def get_history_contract_detail(symbol: str):
+    """获取指定合约的历史详情"""
+    try:
+        import os
+        import json
+        from datetime import datetime
+        
+        history_dir = "cache/monitor_history"
+        contract_file = os.path.join(history_dir, f"{symbol}_history.json")
+        
+        if not os.path.exists(contract_file):
+            raise HTTPException(status_code=404, detail=f"合约 {symbol} 的历史数据不存在")
+        
+        try:
+            with open(contract_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            symbol_name = data.get('symbol', symbol)
+            created_time = data.get('created_time', '')
+            history_records = data.get('history', [])
+            
+            # 按时间排序（最新的在前）
+            history_records.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+            
+            return {
+                "status": "success",
+                "symbol": symbol_name,
+                "history": history_records,
+                "total_records": len(history_records),
+                "created_time": created_time,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            print(f"⚠️ 读取合约历史文件 {contract_file} 失败: {e}")
+            raise HTTPException(status_code=500, detail=f"读取合约历史数据失败: {str(e)}")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"获取合约 {symbol} 历史详情异常: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"获取合约历史详情失败: {str(e)}")
+
 @app.get("/funding_monitor/archive/sessions/{symbol}")
 def get_contract_archive_sessions(symbol: str):
     """获取指定合约的所有归档会话"""

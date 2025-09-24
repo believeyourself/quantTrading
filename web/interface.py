@@ -1326,9 +1326,34 @@ def open_history_contract_modal(n_clicks_list, is_open):
         if not history_records:
             return not is_open, f"{symbol} - 历史详情", html.P("暂无历史数据", className="text-muted"), {}, html.P("暂无历史数据", className="text-muted")
         
-        # 构建统计信息
-        funding_rates = [record['funding_rate'] for record in history_records]
-        mark_prices = [record['mark_price'] for record in history_records]
+        # 构建统计信息 - 添加类型检查和转换
+        funding_rates = []
+        mark_prices = []
+        
+        for record in history_records:
+            try:
+                # 确保funding_rate是数字类型
+                funding_rate = record.get('funding_rate', 0)
+                if isinstance(funding_rate, str):
+                    funding_rate = float(funding_rate) if funding_rate else 0.0
+                else:
+                    funding_rate = float(funding_rate) if funding_rate is not None else 0.0
+                funding_rates.append(funding_rate)
+                
+                # 确保mark_price是数字类型
+                mark_price = record.get('mark_price', 0)
+                if isinstance(mark_price, str):
+                    mark_price = float(mark_price) if mark_price else 0.0
+                else:
+                    mark_price = float(mark_price) if mark_price is not None else 0.0
+                mark_prices.append(mark_price)
+            except (ValueError, TypeError) as e:
+                print(f"⚠️ 处理历史记录时数据类型转换失败: {e}")
+                funding_rates.append(0.0)
+                mark_prices.append(0.0)
+        
+        if not funding_rates or not mark_prices:
+            return not is_open, f"{symbol} - 历史详情", html.P("数据格式异常", className="text-danger"), {}, html.P("数据格式异常", className="text-danger")
         
         max_rate = max(funding_rates)
         min_rate = min(funding_rates)
@@ -1371,10 +1396,32 @@ def open_history_contract_modal(n_clicks_list, is_open):
             ], width=6)
         ])
         
-        # 构建图表
-        timestamps = [record['timestamp'] for record in history_records]
-        funding_rates = [record['funding_rate'] for record in history_records]
-        mark_prices = [record['mark_price'] for record in history_records]
+        # 构建图表 - 重新处理数据确保类型正确
+        timestamps = [record.get('timestamp', '') for record in history_records]
+        chart_funding_rates = []
+        chart_mark_prices = []
+        
+        for record in history_records:
+            try:
+                # 确保funding_rate是数字类型
+                funding_rate = record.get('funding_rate', 0)
+                if isinstance(funding_rate, str):
+                    funding_rate = float(funding_rate) if funding_rate else 0.0
+                else:
+                    funding_rate = float(funding_rate) if funding_rate is not None else 0.0
+                chart_funding_rates.append(funding_rate)
+                
+                # 确保mark_price是数字类型
+                mark_price = record.get('mark_price', 0)
+                if isinstance(mark_price, str):
+                    mark_price = float(mark_price) if mark_price else 0.0
+                else:
+                    mark_price = float(mark_price) if mark_price is not None else 0.0
+                chart_mark_prices.append(mark_price)
+            except (ValueError, TypeError) as e:
+                print(f"⚠️ 处理图表数据时类型转换失败: {e}")
+                chart_funding_rates.append(0.0)
+                chart_mark_prices.append(0.0)
         
         # 创建图表
         fig = make_subplots(
@@ -1387,7 +1434,7 @@ def open_history_contract_modal(n_clicks_list, is_open):
         fig.add_trace(
             go.Scatter(
                 x=timestamps,
-                y=[rate * 100 for rate in funding_rates],
+                y=[rate * 100 for rate in chart_funding_rates],
                 mode='lines+markers',
                 name='资金费率 (%)',
                 line=dict(color='blue', width=2),
@@ -1400,7 +1447,7 @@ def open_history_contract_modal(n_clicks_list, is_open):
         fig.add_trace(
             go.Scatter(
                 x=timestamps,
-                y=mark_prices,
+                y=chart_mark_prices,
                 mode='lines+markers',
                 name='标记价格 ($)',
                 line=dict(color='green', width=2),
@@ -1431,16 +1478,49 @@ def open_history_contract_modal(n_clicks_list, is_open):
         
         history_table_rows = []
         for record in history_records:
-            history_table_rows.append(
-                html.Tr([
-                    html.Td(record.get('timestamp', '')[:19] if record.get('timestamp') else '未知'),
-                    html.Td(f"{record.get('funding_rate', 0)*100:.4f}%"),
-                    html.Td(f"${record.get('mark_price', 0):.4f}"),
-                    html.Td(f"${record.get('index_price', 0):.4f}"),
-                    html.Td(record.get('data_source', 'unknown')),
-                    html.Td(record.get('last_updated', '')[:19] if record.get('last_updated') else '未知')
-                ])
-            )
+            try:
+                # 安全地转换数据类型
+                funding_rate = record.get('funding_rate', 0)
+                if isinstance(funding_rate, str):
+                    funding_rate = float(funding_rate) if funding_rate else 0.0
+                else:
+                    funding_rate = float(funding_rate) if funding_rate is not None else 0.0
+                
+                mark_price = record.get('mark_price', 0)
+                if isinstance(mark_price, str):
+                    mark_price = float(mark_price) if mark_price else 0.0
+                else:
+                    mark_price = float(mark_price) if mark_price is not None else 0.0
+                
+                index_price = record.get('index_price', 0)
+                if isinstance(index_price, str):
+                    index_price = float(index_price) if index_price else 0.0
+                else:
+                    index_price = float(index_price) if index_price is not None else 0.0
+                
+                history_table_rows.append(
+                    html.Tr([
+                        html.Td(record.get('timestamp', '')[:19] if record.get('timestamp') else '未知'),
+                        html.Td(f"{funding_rate*100:.4f}%"),
+                        html.Td(f"${mark_price:.4f}"),
+                        html.Td(f"${index_price:.4f}"),
+                        html.Td(record.get('data_source', 'unknown')),
+                        html.Td(record.get('last_updated', '')[:19] if record.get('last_updated') else '未知')
+                    ])
+                )
+            except (ValueError, TypeError) as e:
+                print(f"⚠️ 处理表格记录时数据类型转换失败: {e}")
+                # 使用默认值
+                history_table_rows.append(
+                    html.Tr([
+                        html.Td(record.get('timestamp', '')[:19] if record.get('timestamp') else '未知'),
+                        html.Td("0.0000%"),
+                        html.Td("$0.0000"),
+                        html.Td("$0.0000"),
+                        html.Td(record.get('data_source', 'unknown')),
+                        html.Td(record.get('last_updated', '')[:19] if record.get('last_updated') else '未知')
+                    ])
+                )
         
         history_table = dbc.Table(history_table_header + [html.Tbody(history_table_rows)], bordered=True, hover=True, responsive=True, size="sm")
         
