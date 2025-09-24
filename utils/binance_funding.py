@@ -8,6 +8,10 @@ from typing import Dict, List, Optional, Any
 import os
 import json
 import requests
+import urllib3
+
+# 禁用urllib3的SSL警告
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 """
 注意: 为了提升在不同 Python 版本/环境下的可用性，本模块避免在导入阶段强依赖 pandas。
 涉及 CSV 缓存的读写仅在运行到相应函数时尝试按需导入 pandas；
@@ -43,65 +47,94 @@ class BinanceFunding:
             else:
                 res = self.cm.market.get_premiumIndex(symbol=symbol)
                 
-            if res and res.get('code') == 200:
-                data = self._parse_single(res['data'])
-                funding_rate = data.get('lastFundingRate', 0)
-                mark_price = data.get('markPrice', 0)
-                next_time = data.get('nextFundingTime')
-                
-                # 确保funding_rate是数值类型
-                try:
-                    funding_rate = float(funding_rate) if funding_rate is not None else 0.0
-                except (ValueError, TypeError):
-                    funding_rate = 0.0
-                
-                # 确保mark_price是数值类型
-                try:
-                    mark_price = float(mark_price) if mark_price is not None else 0.0
-                except (ValueError, TypeError):
-                    mark_price = 0.0
-                
-                result = {
-                    'symbol': data.get('symbol', symbol),
-                    'funding_rate': funding_rate,
-                    'next_funding_time': next_time,
-                    'mark_price': mark_price,
-                    'index_price': data.get('indexPrice'),
-                    'raw': data
-                }
-                
-
-                
-                return result
-            else:
-                print(f"    ❌ {symbol}: API响应异常 | 状态码: {res.get('code') if res else 'None'} | 响应: {res}")
+            # 添加详细的调试信息
+            if not res:
+                print(f"⚠️ {symbol}: API返回空响应，跳过当前资金费率获取")
                 return None
+            
+            if not isinstance(res, dict):
+                print(f"⚠️ {symbol}: API响应格式异常 (类型: {type(res)})，跳过当前资金费率获取")
+                return None
+            
+            if res.get('code') != 200:
+                print(f"⚠️ {symbol}: API响应错误 (code: {res.get('code')}, msg: {res.get('msg', 'unknown')})，跳过当前资金费率获取")
+                return None
+            
+            data_list = res.get('data', [])
+            if not data_list:
+                print(f"⚠️ {symbol}: API返回空数据，跳过当前资金费率获取")
+                return None
+            
+            data = self._parse_single(data_list)
+            funding_rate = data.get('lastFundingRate', 0)
+            mark_price = data.get('markPrice', 0)
+            next_time = data.get('nextFundingTime')
+            
+            # 确保funding_rate是数值类型
+            try:
+                funding_rate = float(funding_rate) if funding_rate is not None else 0.0
+            except (ValueError, TypeError):
+                funding_rate = 0.0
+            
+            # 确保mark_price是数值类型
+            try:
+                mark_price = float(mark_price) if mark_price is not None else 0.0
+            except (ValueError, TypeError):
+                mark_price = 0.0
+            
+            result = {
+                'symbol': data.get('symbol', symbol),
+                'funding_rate': funding_rate,
+                'next_funding_time': next_time,
+                'mark_price': mark_price,
+                'index_price': data.get('indexPrice'),
+                'raw': data
+            }
+            
+            return result
         except Exception as e:
-            print(f"    ❌ {symbol}: API调用异常 | 错误: {e}")
+            print(f"⚠️ {symbol}: API调用异常 ({type(e).__name__}: {e})，跳过当前资金费率获取")
             return None
 
     def get_funding_history(self, symbol: str, contract_type: str = "UM", limit: int = 10) -> List[dict]:
         if not self.available:
+            print(f"⚠️ {symbol}: binance_interface 未安装或不可用，跳过历史资金费率获取")
             return []
         try:
             if contract_type == "UM":
                 res = self.um.market.get_fundingRate(symbol=symbol, limit=limit)
             else:
                 res = self.cm.market.get_fundingRate(symbol=symbol, limit=limit)
-            if res and res.get('code') == 200:
-                data = res['data']
-                return [
-                    {
-                        'symbol': d.get('symbol', symbol),
-                        'funding_time': d.get('fundingTime'),
-                        'funding_rate': d.get('fundingRate'),
-                        'mark_price': d.get('markPrice'),
-                        'raw': d
-                    } for d in data
-                ]
-            return []
+            
+            # 添加详细的调试信息
+            if not res:
+                print(f"⚠️ {symbol}: API返回空响应，跳过历史资金费率获取")
+                return []
+            
+            if not isinstance(res, dict):
+                print(f"⚠️ {symbol}: API响应格式异常 (类型: {type(res)})，跳过历史资金费率获取")
+                return []
+            
+            if res.get('code') != 200:
+                print(f"⚠️ {symbol}: API响应错误 (code: {res.get('code')}, msg: {res.get('msg', 'unknown')})，跳过历史资金费率获取")
+                return []
+            
+            data = res.get('data', [])
+            if not data:
+                print(f"⚠️ {symbol}: API返回空数据，跳过历史资金费率获取")
+                return []
+            
+            return [
+                {
+                    'symbol': d.get('symbol', symbol),
+                    'funding_time': d.get('fundingTime'),
+                    'funding_rate': d.get('fundingRate'),
+                    'mark_price': d.get('markPrice'),
+                    'raw': d
+                } for d in data
+            ]
         except Exception as e:
-            print(f"❌ 获取历史资金费率失败: {e}")
+            print(f"⚠️ {symbol}: 获取历史资金费率失败 ({type(e).__name__}: {e})，跳过历史资金费率获取")
             return []
 
     def detect_funding_interval(self, symbol: str, contract_type: str = "UM") -> Optional[float]:

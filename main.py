@@ -13,6 +13,14 @@ from datetime import datetime
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+# 导入SSL警告修复（必须在其他模块之前导入）
+try:
+    from utils.ssl_warning_fix import *
+except ImportError:
+    # 如果导入失败，直接在这里禁用警告
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 from config.settings import settings
 from strategies.factory import StrategyFactory
 from api.routes import app

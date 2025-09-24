@@ -1,6 +1,10 @@
 """
 代理配置设置
 """
+import urllib3
+
+# 禁用urllib3的SSL警告
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # 代理配置
 PROXY_CONFIG = {

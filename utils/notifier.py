@@ -1,8 +1,12 @@
 import os
 import requests
+import urllib3
 from typing import Optional
 from loguru import logger
 from config.settings import settings
+
+# 禁用urllib3的SSL警告
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def send_telegram_message(message: str, chat_id: Optional[str] = None, bot_token: Optional[str] = None) -> bool:
     """
@@ -17,9 +21,9 @@ def send_telegram_message(message: str, chat_id: Optional[str] = None, bot_token
         bool: 发送是否成功
     """
     try:
-        # 优先从参数，其次从config.settings，最后从环境变量
-        chat_id = chat_id or settings.TELEGRAM_CHAT_ID or os.getenv('TELEGRAM_CHAT_ID')
-        bot_token = bot_token or settings.TELEGRAM_BOT_TOKEN or os.getenv('TELEGRAM_BOT_TOKEN')
+        # 仅从参数或config.settings读取，不再读取环境变量
+        chat_id = chat_id or settings.TELEGRAM_CHAT_ID
+        bot_token = bot_token or settings.TELEGRAM_BOT_TOKEN
         
         if not chat_id or not bot_token:
             logger.warning("Telegram配置缺失，跳过消息发送")
